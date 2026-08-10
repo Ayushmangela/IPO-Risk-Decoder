@@ -134,21 +134,36 @@ def _call_gemini_llm(prompt: str, system_prompt: str) -> str:
         },
     }
 
-    max_retries = 5
+    max_retries = 4
     for attempt in range(1, max_retries + 1):
-        response = requests.post(url, json=payload, timeout=30)
-        if response.status_code == 429 and attempt < max_retries:
-            wait_time = 4 * attempt
-            time.sleep(wait_time)
-            continue
-        response.raise_for_status()
-        data = response.json()
-        candidates = data.get("candidates", [])
-        if candidates and "content" in candidates[0]:
-            parts = candidates[0]["content"].get("parts", [])
-            if parts:
-                return parts[0].get("text", "")
-        raise ValueError("No text content returned from Gemini API response.")
+        try:
+            response = requests.post(url, json=payload, timeout=45)
+            if response.status_code == 429:
+                if attempt < max_retries:
+                    wait_time = 10 * attempt  # 10s, 20s, 30s backoff
+                    print(f"⚠️ Gemini API hit 429 Rate Limit. Retrying attempt {attempt}/{max_retries} in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    raise RuntimeError("Gemini API Rate Limit / Daily Quota Exceeded (HTTP 429). Execution halted to prevent writing placeholder data.")
+            response.raise_for_status()
+            data = response.json()
+            candidates = data.get("candidates", [])
+            if candidates and "content" in candidates[0]:
+                parts = candidates[0]["content"].get("parts", [])
+                if parts:
+                    return parts[0].get("text", "")
+            raise ValueError("No text content returned from Gemini API response.")
+        except requests.exceptions.HTTPError as http_err:
+            if response.status_code == 429:
+                if attempt < max_retries:
+                    wait_time = 10 * attempt
+                    print(f"⚠️ Gemini API 429 Quota Exceeded. Retrying attempt {attempt}/{max_retries} in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                raise RuntimeError(f"Gemini API Quota Exceeded (HTTP 429). Run halted: {http_err}") from http_err
+            raise http_err
+
 
 
 def _heuristic_evaluator(risk_text: str, category_only=False, target_cat=None) -> dict:
