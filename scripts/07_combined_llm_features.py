@@ -46,38 +46,21 @@ COMPANY_PDF_MAP = {
         "file": PDF_DIR / "Paytm.pdf",
         "lit_pages": (404, 415),
         "ind_pages": (130, 138),
-        "industry_keywords": ["redseer", "digital payments", "fintech", "gmv", "merchant"],
-        "industry_default_summary": (
-            "Paytm (One97 Communications Limited) operates in India's rapidly expanding digital ecosystem driven by mobile payments, digital commerce, and cloud services. "
-            "According to the RedSeer Report, India's digital payment volume is projected to grow significantly supported by UPI adoption, merchant QR deployment, and credit access. "
-            "Paytm maintains a market-leading position across consumer payment instruments and merchant financial solutions while navigating evolving RBI regulatory frameworks."
-        )
     },
     "lohiacorp": {
         "name": "Lohia Corp Limited",
         "file": PDF_DIR / "lohiacorp.pdf",
         "lit_pages": (436, 448),
         "ind_pages": (153, 162),
-        "industry_keywords": ["frost & sullivan", "technical textiles", "woven fabric", "raffia", "machinery"],
-        "industry_default_summary": (
-            "Lohia Corp Limited is a global leader in manufacturing machinery for technical textiles, specifically synthetic woven fabric and raffia sack production. "
-            "Based on the Frost & Sullivan (F&S) Report, global demand for flexible intermediate bulk containers (FIBC) and technical textile packaging is expanding across cement, agriculture, and chemicals. "
-            "Lohia Corp commands dominant market share in India and exports heavy industrial extrusion and weaving machinery to over 85 countries worldwide."
-        )
     },
     "zomato": {
         "name": "Zomato Limited",
         "file": PDF_DIR / "zomato.pdf",
         "lit_pages": (326, 336),
         "ind_pages": (145, 153),
-        "industry_keywords": ["redseer", "food services", "food delivery", "restaurant", "dining-out"],
-        "industry_default_summary": (
-            "Zomato Limited operates in the high-growth Indian food services and online food delivery market. "
-            "Per the RedSeer Report, India's food service market is undergoing massive digital transformation driven by urban household disposable income, online ordering convenience, and last-mile logistics expansion. "
-            "Zomato holds a duopoly position in food delivery alongside its dining-out and Hyperpure B2B supplies ecosystem."
-        )
     },
 }
+
 
 
 # =====================================================================
@@ -197,28 +180,19 @@ def run_combined_llm_call(extracted: dict, cfg: dict, backend: str = "gemini"):
 
     print(f"🤖 Executing 1 Combined LLM Call for {cname} ({cid.upper()})...")
     
+    # Execute LLM call with strict error propagation (NO silent fake placeholder fallback)
     try:
         raw_resp = query_llm(prompt, system_prompt, backend=backend)
         parsed = clean_json_response(raw_resp)
     except Exception as e:
-        print(f"⚠️ LLM API call note ({e}). Applying company-specific rubric parser.")
-        parsed = {
-            "litigation": [],
-            "industry_summary": cfg["industry_default_summary"]
-        }
-        for idx, c in enumerate(cases, 1):
-            t_lower = c["case_text"].lower()
-            cat = "Tax" if any(k in t_lower for k in ["tax", "gst", "income tax", "customs", "duty"]) else \
-                  "Criminal" if any(k in t_lower for k in ["criminal", "fir", "offence", "penal"]) else \
-                  "Regulatory/SEBI" if any(k in t_lower for k in ["sebi", "rbi", "regulatory", "penalty", "notice"]) else "Civil"
-            parsed["litigation"].append({
-                "case_id": idx,
-                "category": cat,
-                "reasoning": f"{cat} proceeding involving {c['party_type']} evaluated based on DRHP disclosures."
-            })
+        print(f"❌ API Call Failed for {cid.upper()}: {e}")
+        raise RuntimeError(f"Combined LLM API call failed for company '{cid.upper()}': {e}. Execution halted. No placeholder data will be written.") from e
 
     # Validate litigation response
     lit_results = parsed.get("litigation", [])
+    if not isinstance(lit_results, list) or len(lit_results) == 0:
+        raise ValueError(f"Invalid or empty litigation JSON array returned for {cid.upper()}. Response: {parsed}")
+
     scored_litigation = []
     for idx, c in enumerate(cases, 1):
         matched = None
@@ -233,9 +207,9 @@ def run_combined_llm_call(extracted: dict, cfg: dict, backend: str = "gemini"):
         reason = str(matched.get("reasoning", "") if matched else "").strip()
 
         if cat not in VALID_LIT_CATEGORIES:
-            cat = "Tax" if "tax" in c["case_text"].lower() else "Civil"
+            cat = "Civil"
         if not reason:
-            reason = f"{cat} proceeding involving {c['party_type']} evaluated based on DRHP disclosures."
+            reason = f"{cat} proceeding involving {c['party_type']} disclosed in DRHP filings."
 
         scored_litigation.append({
             "company_id": cid,
@@ -247,14 +221,15 @@ def run_combined_llm_call(extracted: dict, cfg: dict, backend: str = "gemini"):
         })
 
     industry_summary = str(parsed.get("industry_summary", "")).strip()
-    if not industry_summary or len(industry_summary) < 50:
-        industry_summary = cfg["industry_default_summary"]
+    if not industry_summary or len(industry_summary) < 40:
+        raise ValueError(f"Invalid or missing industry_summary in LLM JSON response for {cid.upper()}. Response: {parsed}")
 
     return {
         "company_id": cid,
         "litigation_scores": scored_litigation,
         "industry_summary": industry_summary,
     }
+
 
 
 # =====================================================================
@@ -311,10 +286,12 @@ def main():
         print(f"   - Raw Industry Text Snippet: {extracted['raw_industry_text'][:120]}...\n")
 
         if llm_calls_made > 0 and backend == "gemini":
-            time.sleep(1.5)
+            print(f"⌛ Rate-limit spacing: Waiting 20 seconds before next company API call...")
+            time.sleep(20.0)
 
         # Step 2: Single combined LLM call per company across ALL uncapped cases
-        res = run_combined_llm_call(extracted, cfg, backend=backend)
+        res = run_combined_llm_call(extracted, backend=backend)
+
         llm_calls_made += 1
 
         all_litigation_rows.extend(res["litigation_scores"])
