@@ -280,6 +280,54 @@ def score_severity(risk_text: str, category: str, backend: str = LLM_BACKEND) ->
     return _heuristic_evaluator(risk_text, category_only=False, target_cat=category)
 
 
+def process_risk_item_single_pass(risk_text: str, backend: str = LLM_BACKEND) -> dict:
+    """
+    Single-pass LLM pipeline function: Performs categorization AND severity scoring in 1 API call.
+    Reduces total API calls by 50% while preserving rubric guidance and forced JSON validation.
+    """
+    few_shot = load_few_shot_examples(exclude_text=risk_text)
+    system_prompt = (
+        "Classify the following IPO DRHP risk factor into exactly one category: "
+        "Financial, Legal, Regulatory, Operational, Market, Reputational.\n"
+        "And score its severity (1-5) using the rubric below:\n\n"
+        f"{RUBRIC_DESCRIPTION}\n"
+        "FEW-SHOT EXAMPLES:\n"
+        f"{few_shot}\n\n"
+        "Return ONLY valid JSON format:\n"
+        '{\n'
+        '  "category": "<Financial|Legal|Regulatory|Operational|Market|Reputational>",\n'
+        '  "confidence": "high",\n'
+        '  "score": <1-5 integer>,\n'
+        '  "reasoning": "<one sentence explanation justifying category and score based on rubric>"\n'
+        '}'
+    )
+    prompt = f'Risk Factor: "{risk_text}"'
+
+    if backend in ["local", "gemini"]:
+        try:
+            raw_resp = query_llm(prompt, system_prompt, backend)
+            parsed = clean_json_response(raw_resp)
+            cat = str(parsed.get("category", "")).strip().capitalize()
+            if cat not in VALID_CATEGORIES:
+                cat = _heuristic_evaluator(risk_text, category_only=True)["category"]
+            score = int(parsed.get("score", 3))
+            score = max(1, min(5, score))
+            reasoning = str(parsed.get("reasoning", "")).strip()
+            if not reasoning:
+                reasoning = f"{score} - {cat} risk evaluated based on DRHP text specificity."
+            return {
+                "category": cat,
+                "confidence": parsed.get("confidence", "high"),
+                "score": score,
+                "reasoning": reasoning,
+                "raw_response": raw_resp,
+            }
+        except Exception as e:
+            print(f"⚠️ Single-pass LLM call failed ({e}). Falling back to two-step pipeline.")
+
+    return process_risk_item(risk_text, backend=backend)
+
+
 def process_risk_item(risk_text: str, backend: str = LLM_BACKEND) -> dict:
     """Combined pipeline function: runs categorization then severity scoring."""
     cat_result = categorize_risk(risk_text, backend=backend)
@@ -294,3 +342,4 @@ def process_risk_item(risk_text: str, backend: str = LLM_BACKEND) -> dict:
         "cat_raw_response": cat_result.get("raw_response", ""),
         "score_raw_response": score_result.get("raw_response", ""),
     }
+
