@@ -8,6 +8,9 @@ env/
 *.sqlite3
 *.db
 
+# PDFs (stored locally)
+data/pdfs/*.pdf
+
 # Node / React
 node_modules/
 frontend/node_modules/
