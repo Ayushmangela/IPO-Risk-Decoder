@@ -222,3 +222,54 @@ def get_company_summary(company_id: str):
         ),
         "peer_comparison": peer_stats,
     }
+
+
+# Endpoint 4: GET /methodology
+@app.get("/methodology")
+@app.get("/api/methodology")
+def get_methodology():
+    """Returns methodology details: severity rubric, LLM model validation benchmark, and dataset limitations."""
+    return {
+        "rubric": {
+            "scale": [
+                {"score": 5, "label": "Severe", "description": "Quantified, material impact stated; risk has already materialized or is highly likely"},
+                {"score": 4, "label": "High", "description": "Specific and material, but contingent/forward-looking"},
+                {"score": 3, "label": "Moderate", "description": "Real but vague — no numbers, generic industry risk"},
+                {"score": 2, "label": "Low", "description": "Boilerplate/standard risk present in nearly every DRHP in this industry, low specificity"},
+                {"score": 1, "label": "Minimal", "description": "Reassurance-style language with no real substance"}
+            ],
+            "categories": ["Financial", "Legal", "Regulatory", "Operational", "Market", "Reputational"]
+        },
+        "validation_benchmark": {
+            "ground_truth_samples": 100,
+            "threshold_required": "≥80.0%",
+            "models_evaluated": [
+                {
+                    "backend": "local",
+                    "model_name": "llama3.2:3b (Ollama)",
+                    "category_match_pct": 23.0,
+                    "severity_within_pm1_pct": 59.0,
+                    "status": "FAILED",
+                    "reason": "Failed both category (23% vs 80%) and score accuracy thresholds (59% vs 80%). Over-indexed on score 5."
+                },
+                {
+                    "backend": "gemini",
+                    "model_name": "gemini-flash-latest (Google)",
+                    "category_match_pct": 89.0,
+                    "severity_within_pm1_pct": 100.0,
+                    "status": "PASSED",
+                    "reason": "Exceeded all validation thresholds (89% category match, 100% score within ±1, MAE 0.030)."
+                }
+            ]
+        },
+        "limitations_notice": {
+            "title": "Single-Company-Per-Sector Limitation Notice",
+            "description": (
+                "Since each of the 3 sample companies (Paytm: Fintech, Lohia Corp: Capital Goods, Zomato: Consumer Internet) "
+                "belongs to a different sector, the peer benchmarking engine calculates a cross-company comparison baseline "
+                "rather than a true same-sector peer benchmark. In production with multiple companies per sector, comparison "
+                "must be grouped strictly by sector."
+            )
+        }
+    }
+
