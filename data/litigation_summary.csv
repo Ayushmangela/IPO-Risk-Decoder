@@ -1,0 +1,4 @@
+company_id,total_cases,criminal_count,civil_count,tax_count,regulatory_count,other_count
+paytm,10,5,4,0,1,0
+lohiacorp,10,8,2,0,0,0
+zomato,10,2,0,1,7,0
