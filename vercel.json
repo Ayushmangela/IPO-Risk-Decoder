@@ -1,34 +1,21 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "backend/main.py",
-      "use": "@vercel/python"
+      "source": "/companies/:path*",
+      "destination": "/api/index.py"
     },
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "backend/main.py"
+      "source": "/companies",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/companies(.*)",
-      "dest": "backend/main.py"
+      "source": "/methodology",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/methodology",
-      "dest": "backend/main.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend/$1"
+      "source": "/api/:path*",
+      "destination": "/api/index.py"
     }
   ]
 }
