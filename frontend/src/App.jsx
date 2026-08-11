@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { 
   Building2, AlertTriangle, ShieldAlert, BarChart3, ChevronDown, ChevronUp, Search, Info, CheckCircle2,
-  BookOpen, CheckSquare, XCircle, Award, LayoutDashboard, FileText
+  BookOpen, CheckSquare, XCircle, Award, LayoutDashboard, FileText, AlertCircle, EyeOff
 } from 'lucide-react';
 
 const API_BASE_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
@@ -35,6 +35,7 @@ export default function App() {
   const [companies, setCompanies] = useState([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
+  const [outliersData, setOutliersData] = useState(null);
   const [risks, setRisks] = useState([]);
   const [litigationCases, setLitigationCases] = useState([]);
   const [methodologyData, setMethodologyData] = useState(null);
@@ -71,7 +72,7 @@ export default function App() {
       .catch((err) => console.error('Error fetching methodology:', err));
   }, []);
 
-  // 2. Fetch Summary, Risks & Litigation when selectedCompanyId changes
+  // 2. Fetch Summary, Outliers, Risks & Litigation when selectedCompanyId changes
   useEffect(() => {
     if (!selectedCompanyId) return;
 
@@ -96,6 +97,12 @@ export default function App() {
         console.error('Error fetching summary:', err);
         setLoadingSummary(false);
       });
+
+    // Fetch Outliers (DDI & Obfuscation)
+    fetch(`${API_BASE_URL}/companies/${selectedCompanyId}/outliers`)
+      .then((res) => res.json())
+      .then((data) => setOutliersData(data))
+      .catch((err) => console.error('Error fetching outliers:', err));
 
     // Fetch Risks
     fetch(`${API_BASE_URL}/companies/${selectedCompanyId}/risks`)
@@ -165,6 +172,9 @@ export default function App() {
       c.reasoning.toLowerCase().includes(litigationSearchQuery.toLowerCase());
     return matchesCat && matchesSearch;
   });
+
+  // Top 3 DDI Outliers
+  const topDdiOutliers = outliersData?.ddi_outliers ? outliersData.ddi_outliers.slice(0, 3) : [];
 
 
   return (
@@ -284,7 +294,124 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Litigation Load Section */}
+                {/* 2. Disclosure Quality Section (DDI & Obfuscation Test) */}
+                {(summaryData.obfuscation || summaryData.ddi) && (
+                  <div className="disclosure-quality-card">
+                    <h3 className="card-title">
+                      <EyeOff size={18} color="#a855f7" />
+                      Disclosure Quality & Algorithmic Distortion Analysis
+                    </h3>
+
+                    {/* Obfuscation Test Callout */}
+                    {summaryData.obfuscation && (
+                      <div className="obfuscation-box">
+                        <div>
+                          <div className="obfuscation-title">
+                            <BookOpen size={16} color="#818cf8" />
+                            Obfuscation Test Result (Spearman Rank Correlation)
+                          </div>
+                          <p className="obfuscation-desc">
+                            Severity and readability showed{' '}
+                            <strong>
+                              {summaryData.obfuscation.p_value < 0.05
+                                ? 'a statistically significant correlation'
+                                : 'no statistically significant correlation'}
+                            </strong>{' '}
+                            ({summaryData.obfuscation.interpretation}, p = {summaryData.obfuscation.p_value}, Spearman ρ = {summaryData.obfuscation.spearman_correlation}).
+                          </p>
+                        </div>
+                        <div className="obfuscation-stat-badge">
+                          Spearman ρ: {summaryData.obfuscation.spearman_correlation} | p = {summaryData.obfuscation.p_value}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* DDI Summary Metrics Row */}
+                    {summaryData.ddi && (
+                      <div className="metrics-row mb-8">
+                        <div className="metric-card">
+                          <div className="metric-icon-box">
+                            <FileText size={22} color="#38bdf8" />
+                          </div>
+                          <div>
+                            <div className="metric-val">{summaryData.ddi.avg_materiality} / 100</div>
+                            <div className="metric-lbl">Avg Materiality Score</div>
+                          </div>
+                        </div>
+
+                        <div className="metric-card">
+                          <div className="metric-icon-box">
+                            <BarChart3 size={22} color="#c084fc" />
+                          </div>
+                          <div>
+                            <div className="metric-val">{summaryData.ddi.avg_emphasis} / 100</div>
+                            <div className="metric-lbl">Avg Emphasis Score</div>
+                          </div>
+                        </div>
+
+                        <div className="metric-card">
+                          <div className="metric-icon-box">
+                            <AlertCircle size={22} color="#f87171" />
+                          </div>
+                          <div>
+                            <div className="metric-val" style={{ color: summaryData.ddi.avg_ddi > 0 ? '#f87171' : '#cbd5e1' }}>
+                              {summaryData.ddi.avg_ddi > 0 ? `+${summaryData.ddi.avg_ddi}` : summaryData.ddi.avg_ddi}
+                            </div>
+                            <div className="metric-lbl">Avg Distortion Index (DDI)</div>
+                          </div>
+                        </div>
+
+                        <div className="metric-card">
+                          <div className="metric-icon-box">
+                            <EyeOff size={22} color="#ef4444" />
+                          </div>
+                          <div>
+                            <div className="metric-val" style={{ color: '#f87171' }}>{summaryData.ddi.buried_risk_count}</div>
+                            <div className="metric-lbl">Buried Risks Flagged (DDI &gt; +30)</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Buried Risks Callout (Top 3 DDI Outliers) */}
+                    {topDdiOutliers.length > 0 && (
+                      <div>
+                        <div className="buried-risks-header">
+                          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <AlertTriangle size={16} />
+                            Top Buried Important Risks Callout
+                          </h4>
+                          <p className="buried-risks-subtext">
+                            Disclosures flagged with high financial materiality but placed with low visual or positional emphasis in the DRHP filing.
+                          </p>
+                        </div>
+
+                        <div className="buried-risks-grid">
+                          {topDdiOutliers.map((item) => (
+                            <div key={item.risk_number} className="buried-risk-card">
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                  <span className="badge badge-cat">{item.category}</span>
+                                  <span className="ddi-badge-positive">DDI Score: +{item.ddi_score}</span>
+                                </div>
+                                <p style={{ fontSize: '0.85rem', color: '#e2e8f0', lineHeight: 1.45 }}>
+                                  <strong>Risk #{item.risk_number}:</strong> "{item.risk_snippet}"
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+                                <span>Severity: <strong>{item.score}/5</strong></span>
+                                <span>Materiality: <strong style={{ color: '#38bdf8' }}>{item.materiality_score}</strong></span>
+                                <span>Emphasis: <strong style={{ color: '#c084fc' }}>{item.emphasis_score}</strong></span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. Litigation Load Section */}
                 {summaryData.litigation_summary && (
                   <div className="litigation-load-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -556,14 +683,45 @@ export default function App() {
                               <strong>Risk #{risk.risk_number}:</strong> {risk.risk_text}
                             </p>
 
-                            {/* LLM Reasoning Field (Expanded) */}
+                            {/* Expanded Detail View */}
                             {isExpanded && (
-                              <div className="risk-reasoning-box">
-                                <div className="reasoning-title">
-                                  <CheckCircle2 size={14} />
-                                  LLM Audit Reasoning
+                              <div>
+                                {/* Expanded Metrics Grid (DDI & Readability) */}
+                                <div className="expanded-metrics-grid">
+                                  <div className="metric-mini-box">
+                                    <div className="metric-mini-lbl">Disclosure Distortion Index</div>
+                                    <div className="metric-mini-val" style={{ color: risk.ddi_score > 30 ? '#f87171' : '#a5b4fc' }}>
+                                      {risk.ddi_score > 0 ? `+${risk.ddi_score}` : risk.ddi_score}
+                                    </div>
+                                  </div>
+                                  <div className="metric-mini-box">
+                                    <div className="metric-mini-lbl">Materiality Score</div>
+                                    <div className="metric-mini-val" style={{ color: '#38bdf8' }}>
+                                      {risk.materiality_score} / 100
+                                    </div>
+                                  </div>
+                                  <div className="metric-mini-box">
+                                    <div className="metric-mini-lbl">Emphasis Score</div>
+                                    <div className="metric-mini-val" style={{ color: '#c084fc' }}>
+                                      {risk.emphasis_score} / 100
+                                    </div>
+                                  </div>
+                                  <div className="metric-mini-box">
+                                    <div className="metric-mini-lbl">Flesch Readability Score</div>
+                                    <div className="metric-mini-val" style={{ color: '#facc15' }}>
+                                      {risk.readability_score} (FRE)
+                                    </div>
+                                  </div>
                                 </div>
-                                <p>{risk.reasoning}</p>
+
+                                {/* LLM Reasoning Box */}
+                                <div className="risk-reasoning-box">
+                                  <div className="reasoning-title">
+                                    <CheckCircle2 size={14} />
+                                    LLM Audit Reasoning
+                                  </div>
+                                  <p>{risk.reasoning}</p>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -608,25 +766,23 @@ export default function App() {
                       />
                     </div>
 
-                    {/* Litigation List */}
+                    {/* Litigation Cases List */}
                     <div className="risk-list">
-                      {filteredLitigation.map((lit) => {
-                        const isExpanded = expandedLitigationId === lit.case_id;
+                      {filteredLitigation.map((item) => {
+                        const isExpanded = expandedLitigationId === item.case_id;
                         return (
                           <div
-                            key={lit.case_id}
-                            id={`lit-case-item-${lit.case_id}`}
+                            key={item.case_id}
+                            id={`litigation-item-${item.case_id}`}
                             className="risk-card"
-                            onClick={() => setExpandedLitigationId(isExpanded ? null : lit.case_id)}
+                            onClick={() => setExpandedLitigationId(isExpanded ? null : item.case_id)}
                           >
                             <div className="risk-card-header">
                               <div className="risk-badge-group">
-                                <span
-                                  className={`party-pill party-pill-${lit.party_type.toLowerCase()}`}
-                                >
-                                  {lit.party_type.toUpperCase()}
+                                <span className={`party-pill party-pill-${item.party_type.toLowerCase()}`}>
+                                  {item.party_type.toUpperCase()}
                                 </span>
-                                <span className="badge badge-cat">{lit.category}</span>
+                                <span className="badge badge-cat">{item.category}</span>
                               </div>
                               <div style={{ color: '#94a3b8' }}>
                                 {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -634,17 +790,17 @@ export default function App() {
                             </div>
 
                             <p className="risk-snippet">
-                              <strong>Case #{lit.case_id}:</strong> {lit.case_text}
+                              <strong>Case #{item.case_id}:</strong> {item.case_text}
                             </p>
 
-                            {/* LLM Legal Exposure Reasoning Field (Expanded) */}
+                            {/* LLM Reasoning Field for Litigation (Expanded) */}
                             {isExpanded && (
-                              <div className="risk-reasoning-box" style={{ borderLeftColor: '#ec4899' }}>
-                                <div className="reasoning-title" style={{ color: '#ec4899' }}>
-                                  <ShieldAlert size={14} />
-                                  LLM Legal Exposure Audit & Reasoning
+                              <div className="risk-reasoning-box">
+                                <div className="reasoning-title">
+                                  <CheckCircle2 size={14} />
+                                  LLM Legal Exposure Audit
                                 </div>
-                                <p>{lit.reasoning}</p>
+                                <p>{item.reasoning}</p>
                               </div>
                             )}
                           </div>
@@ -661,152 +817,127 @@ export default function App() {
                 )}
               </div>
             </section>
-
           </>
         )}
 
-        {/* SCREEN 2 (4th Screen): Methodology & Model Audit */}
+        {/* SCREEN 2: Methodology & Audit */}
         {activeScreen === 'methodology' && methodologyData && (
           <section className="section-block">
-            {/* 1. Core Credibility Badge */}
-            <div className="card mb-8" style={{ borderLeft: '4px solid #6366f1', background: 'rgba(99, 102, 241, 0.08)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Award size={24} color="#818cf8" />
-                <h2 className="card-title" style={{ margin: 0 }}>System Credibility & LLM Ground-Truth Validation</h2>
-              </div>
-              <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: '1.6' }}>
-                This project does not rely on unverified LLM ratings. Before trusting severity scores across full prospectus datasets,
-                all LLM pipeline predictions were rigorously validated against <strong>100 manually labeled ground-truth examples</strong> evaluated by financial analysts.
-                Models failing threshold metrics were explicitly rejected.
-              </p>
-            </div>
+            <h2 className="card-title mb-8" style={{ fontSize: '1.4rem' }}>
+              <BookOpen size={22} color="#818cf8" />
+              Project Methodology & Model Validation Audit
+            </h2>
 
-            {/* 2. Model Validation Benchmark Matrix */}
+            {/* Sub-section 1: Severity Rubric */}
             <div className="card mb-8">
               <h3 className="card-title">
-                <CheckSquare size={18} color="#34d399" />
-                LLM Validation Benchmark (Local vs. Gemini Flash)
+                <CheckSquare size={18} color="#6366f1" />
+                Human-Labeled Severity Scoring Rubric (Ground Truth Reference)
               </h3>
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-                Tested on 100 Ground-Truth Labeled DRHP Risk Factors. Validation Threshold: <strong>≥80.0% Agreement Required</strong> before production deployment.
+              <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginBottom: '1rem' }}>
+                All LLM scoring outputs are validated against a 100-sample human-annotated baseline using the following rubric.
               </p>
-
               <div className="data-table-wrapper">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Evaluated LLM Engine</th>
-                      <th>Category Match %</th>
-                      <th>Severity Score (Within ±1) %</th>
-                      <th>MAE (Points)</th>
-                      <th>Validation Outcome</th>
-                      <th>Audit Decision</th>
+                      <th>Score</th>
+                      <th>Label</th>
+                      <th>Operational Definition</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {methodologyData.validation_benchmark.models_evaluated.map((m) => (
-                      <tr key={m.backend}>
-                        <td>
-                          <strong style={{ color: '#fff' }}>{m.model_name}</strong>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Backend: {m.backend}</div>
-                        </td>
-                        <td>
-                          <span style={{ fontWeight: 700, color: m.category_match_pct >= 80 ? '#34d399' : '#f87171' }}>
-                            {m.category_match_pct.toFixed(2)}%
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontWeight: 700, color: m.severity_within_pm1_pct >= 80 ? '#34d399' : '#f87171' }}>
-                            {m.severity_within_pm1_pct.toFixed(2)}%
-                          </span>
-                        </td>
-                        <td>{m.backend === 'gemini' ? '0.030' : '1.240'}</td>
-                        <td>
-                          <span
-                            className={`diff-tag ${m.status === 'PASSED' ? 'diff-negative' : 'diff-positive'}`}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                          >
-                            {m.status === 'PASSED' ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                            {m.status} Threshold
-                          </span>
-                        </td>
-                        <td style={{ fontSize: '0.82rem', color: '#cbd5e1', maxWidth: '300px' }}>
-                          {m.reason}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* 3. Severity Rubric & Categories */}
-            <div className="card mb-8">
-              <h3 className="card-title">
-                <FileText size={18} color="#a855f7" />
-                Severity Scoring Rubric & Risk Categories
-              </h3>
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-                All risk items are categorized into 6 domains and scored on a strict 5-level severity scale defined in <code>/data/rubric.md</code>.
-              </p>
-
-              <div className="data-table-wrapper mb-6">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '120px' }}>Score Level</th>
-                      <th style={{ width: '140px' }}>Severity Band</th>
-                      <th>Rubric Description & Impact Criteria</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {methodologyData.rubric.scale.map((item) => (
+                    {methodologyData.rubric?.scale?.map((item) => (
                       <tr key={item.score}>
                         <td>
                           <span className={`badge badge-score-${item.score}`}>
-                            Score {item.score} / 5
+                            Score {item.score}
                           </span>
                         </td>
-                        <td><strong style={{ color: SEVERITY_COLORS[item.score] }}>{item.label}</strong></td>
+                        <td><strong>{item.label}</strong></td>
                         <td style={{ color: '#cbd5e1' }}>{item.description}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
 
-              <div style={{ marginTop: '1rem' }}>
-                <h4 style={{ fontSize: '0.9rem', color: '#94a3b8', marginBottom: '0.6rem' }}>Supported Risk Categories:</h4>
-                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  {methodologyData.rubric.categories.map((cat) => (
-                    <span
-                      key={cat}
-                      style={{
-                        padding: '0.35rem 0.8rem',
-                        borderRadius: '6px',
-                        background: 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${CATEGORY_COLORS[cat] || '#6366f1'}`,
-                        color: CATEGORY_COLORS[cat] || '#fff',
-                        fontSize: '0.8rem',
-                        fontWeight: '700'
-                      }}
-                    >
-                      {cat}
-                    </span>
-                  ))}
-                </div>
+            {/* Sub-section 2: Validation Benchmark Comparison */}
+            <div className="card mb-8">
+              <h3 className="card-title">
+                <Award size={18} color="#34d399" />
+                LLM Model Validation Benchmark (Local vs Cloud Model)
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginBottom: '1rem' }}>
+                Per project design guidelines, local models must be rigorously benchmarked against human-labeled ground truth (100 risks) before deployment.
+              </p>
+              
+              <div className="data-table-wrapper mb-8">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Model Backend</th>
+                      <th>Model Identity</th>
+                      <th>Category Match %</th>
+                      <th>Severity Within ±1</th>
+                      <th>Validation Result</th>
+                      <th>Audit Decision / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {methodologyData.validation_benchmark?.models_evaluated?.map((m) => (
+                      <tr key={m.model_name}>
+                        <td><span className="badge badge-cat">{m.backend}</span></td>
+                        <td><strong>{m.model_name}</strong></td>
+                        <td>
+                          <span style={{ color: m.category_match_pct >= 80 ? '#34d399' : '#f87171', fontWeight: 700 }}>
+                            {m.category_match_pct}%
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ color: m.severity_within_pm1_pct >= 80 ? '#34d399' : '#f87171', fontWeight: 700 }}>
+                            {m.severity_within_pm1_pct}%
+                          </span>
+                        </td>
+                        <td>
+                          {m.status === 'PASSED' ? (
+                            <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                              <CheckCircle2 size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                              PASSED (DEPLOYED)
+                            </span>
+                          ) : (
+                            <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+                              <XCircle size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                              FAILED (REJECTED)
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{m.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            {/* 4. Methodology & Limitation Notice */}
+            {/* Sub-section 3: Dataset Limitation Notice */}
             <div className="card">
               <h3 className="card-title">
                 <Info size={18} color="#facc15" />
-                {methodologyData.limitations_notice.title}
+                Dataset & Scope Limitation Notice
               </h3>
-              <p style={{ color: '#e2e8f0', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                {methodologyData.limitations_notice.description}
-              </p>
+              <div className="peer-notice-box" style={{ margin: 0 }}>
+                <Info size={20} style={{ flexShrink: 0 }} />
+                <div>
+                  <h4 style={{ fontWeight: 700, marginBottom: '0.25rem', color: '#facc15' }}>
+                    {methodologyData.limitations_notice?.title}
+                  </h4>
+                  <p style={{ color: '#fef08a', lineHeight: 1.5 }}>
+                    {methodologyData.limitations_notice?.description}
+                  </p>
+                </div>
+              </div>
             </div>
           </section>
         )}

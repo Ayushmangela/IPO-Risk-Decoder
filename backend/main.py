@@ -2,12 +2,9 @@
 FastAPI Backend Application for IPO Prospectus Risk Decoder
 
 Per GEMINI.md:
-- Reads strictly from pre-computed offline data (scored_risks.db, companies.csv, peer_stats.csv).
+- Reads strictly from pre-computed offline data (scored_risks.db, companies.csv, peer_stats.csv, reports).
 - NEVER invokes an LLM live during API requests.
-- Exposes 3 core endpoints:
-  1. GET /companies - List of processed companies
-  2. GET /companies/{id}/risks - Full risk factor list with severity scores & reasoning
-  3. GET /companies/{id}/summary - Category breakdown, average severity, & cross-company peer comparison stats
+- Exposes core endpoints for companies, risk factors, summary metrics, litigation load, disclosure distortion, and methodology.
 """
 
 import sqlite3
@@ -25,15 +22,19 @@ COMPANIES_CSV = DATA_DIR / "companies.csv"
 PEER_STATS_CSV = DATA_DIR / "peer_stats.csv"
 INDUSTRY_SUMMARIES_CSV = DATA_DIR / "industry_summaries.csv"
 LITIGATION_SUMMARY_CSV = DATA_DIR / "litigation_summary.csv"
+OBFUSCATION_REPORT_CSV = DATA_DIR / "obfuscation_report.csv"
+DDI_REPORT_CSV = DATA_DIR / "ddi_report.csv"
+OBFUSCATION_OUTLIERS_CSV = DATA_DIR / "obfuscation_outliers.csv"
+DDI_OUTLIERS_CSV = DATA_DIR / "ddi_outliers.csv"
 
 
 app = FastAPI(
     title="IPO Prospectus Risk Decoder API",
-    description="FastAPI service serving pre-computed IPO DRHP risk factor analysis, severity scores, litigation load, and peer benchmarking.",
-    version="1.1.0",
+    description="FastAPI service serving pre-computed IPO DRHP risk factor analysis, severity scores, litigation load, obfuscation metrics, and disclosure distortion analysis.",
+    version="1.2.0",
 )
 
-# Enable CORS for React frontend (Vite default port 5173 and localhost)
+# Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -60,6 +61,10 @@ class RiskItem(BaseModel):
     category: str
     score: int
     reasoning: str
+    ddi_score: Optional[float] = None
+    materiality_score: Optional[float] = None
+    emphasis_score: Optional[float] = None
+    readability_score: Optional[float] = None
 
 
 class LitigationCaseItem(BaseModel):
@@ -91,6 +96,20 @@ class LitigationSummary(BaseModel):
     has_director_or_promoter_litigation: bool
 
 
+class ObfuscationSummary(BaseModel):
+    spearman_correlation: float
+    p_value: float
+    sample_size: int
+    interpretation: str
+
+
+class DDISummary(BaseModel):
+    avg_materiality: float
+    avg_emphasis: float
+    avg_ddi: float
+    buried_risk_count: int
+
+
 class CompanySummary(BaseModel):
     company: CompanyInfo
     total_risks: int
@@ -101,6 +120,26 @@ class CompanySummary(BaseModel):
     peer_comparison: List[CategoryPeerStat]
     industry_summary: Optional[str] = None
     litigation_summary: Optional[LitigationSummary] = None
+    obfuscation: Optional[ObfuscationSummary] = None
+    ddi: Optional[DDISummary] = None
+
+
+class OutlierRiskItem(BaseModel):
+    company_id: str
+    risk_number: int
+    category: str
+    score: int
+    risk_snippet: str
+    ddi_score: Optional[float] = None
+    materiality_score: Optional[float] = None
+    emphasis_score: Optional[float] = None
+    readability_score: Optional[float] = None
+
+
+class CompanyOutliers(BaseModel):
+    company_id: str
+    ddi_outliers: List[OutlierRiskItem]
+    obfuscation_outliers: List[OutlierRiskItem]
 
 
 # =====================================================================
@@ -126,23 +165,36 @@ def find_company_by_id(company_id: str) -> Optional[Dict]:
 
 
 def fetch_risks_for_company(company_id: str) -> List[Dict]:
-    """Fetches scored risk items from SQLite data/scored_risks.db."""
+    """Fetches scored risk items joined with DDI and Readability scores."""
     if not SCORED_RISKS_DB.exists():
         raise HTTPException(status_code=500, detail="Database scored_risks.db not found.")
 
     conn = sqlite3.connect(SCORED_RISKS_DB)
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT company_id, risk_number, risk_text, category, score, reasoning 
-        FROM scored_risks 
-        WHERE LOWER(company_id) = ? 
-        ORDER BY risk_number ASC
-        """,
-        (company_id.strip().lower(),),
-    )
-    rows = cursor.fetchall()
-    conn.close()
+    
+    query = """
+        SELECT s.company_id, s.risk_number, s.risk_text, s.category, s.score, s.reasoning,
+               COALESCE(d.ddi_score, s.ddi_score, 0.0) as ddi_score,
+               COALESCE(d.materiality_score, 0.0) as materiality_score,
+               COALESCE(d.emphasis_score, 0.0) as emphasis_score,
+               COALESCE(r.readability_score, s.readability_score, 0.0) as readability_score
+        FROM scored_risks s
+        LEFT JOIN risk_ddi d ON LOWER(s.company_id) = LOWER(d.company_id) AND s.risk_number = d.risk_number
+        LEFT JOIN risk_readability r ON LOWER(s.company_id) = LOWER(r.company_id) AND s.risk_number = r.risk_number
+        WHERE LOWER(s.company_id) = ? 
+        ORDER BY s.risk_number ASC
+    """
+    
+    try:
+        cursor.execute(query, (company_id.strip().lower(),))
+        rows = cursor.fetchall()
+    except sqlite3.OperationalError:
+        # Fallback to standard columns if tables missing
+        cursor.execute("SELECT company_id, risk_number, risk_text, category, score, reasoning FROM scored_risks WHERE LOWER(company_id) = ? ORDER BY risk_number ASC", (company_id.strip().lower(),))
+        raw_rows = cursor.fetchall()
+        rows = [(r[0], r[1], r[2], r[3], r[4], r[5], 0.0, 0.0, 0.0, 0.0) for r in raw_rows]
+    finally:
+        conn.close()
 
     result = []
     for r in rows:
@@ -153,6 +205,10 @@ def fetch_risks_for_company(company_id: str) -> List[Dict]:
             "category": r[3],
             "score": r[4],
             "reasoning": r[5],
+            "ddi_score": round(float(r[6]), 2),
+            "materiality_score": round(float(r[7]), 2),
+            "emphasis_score": round(float(r[8]), 2),
+            "readability_score": round(float(r[9]), 2),
         })
     return result
 
@@ -250,6 +306,87 @@ def fetch_litigation_summary_for_company(company_id: str) -> Dict:
     }
 
 
+def fetch_obfuscation_summary_for_company(company_id: str) -> Optional[Dict]:
+    """Fetches Spearman correlation metrics from data/obfuscation_report.csv."""
+    if not OBFUSCATION_REPORT_CSV.exists():
+        return None
+    df = pd.read_csv(OBFUSCATION_REPORT_CSV)
+    c_df = df[df["company_id"].str.strip().str.lower() == company_id.strip().lower()]
+    if c_df.empty:
+        return None
+    row = c_df.iloc[0]
+    return {
+        "spearman_correlation": round(float(row["spearman_correlation"]), 4),
+        "p_value": round(float(row["p_value"]), 4),
+        "sample_size": int(row["sample_size"]),
+        "interpretation": str(row["interpretation"]),
+    }
+
+
+def fetch_ddi_summary_for_company(company_id: str, risks: List[Dict]) -> Optional[Dict]:
+    """Computes DDI summary metrics from company risks list."""
+    if not risks:
+        return None
+    mats = [r["materiality_score"] for r in risks if r.get("materiality_score") is not None]
+    emps = [r["emphasis_score"] for r in risks if r.get("emphasis_score") is not None]
+    ddis = [r["ddi_score"] for r in risks if r.get("ddi_score") is not None]
+
+    if not ddis:
+        return None
+
+    avg_mat = round(sum(mats) / len(mats), 2)
+    avg_emp = round(sum(emps) / len(emps), 2)
+    avg_ddi = round(sum(ddis) / len(ddis), 2)
+    buried_count = len([d for d in ddis if d > 30.0])
+
+    return {
+        "avg_materiality": avg_mat,
+        "avg_emphasis": avg_emp,
+        "avg_ddi": avg_ddi,
+        "buried_risk_count": buried_count,
+    }
+
+
+def fetch_outliers_for_company(company_id: str) -> Dict:
+    """Fetches top DDI and Obfuscation outliers for a company from CSV files."""
+    cid_target = company_id.strip().lower()
+    ddi_outliers = []
+    obf_outliers = []
+
+    if DDI_OUTLIERS_CSV.exists():
+        df_ddi = pd.read_csv(DDI_OUTLIERS_CSV)
+        c_ddi = df_ddi[df_ddi["company_id"].str.strip().str.lower() == cid_target]
+        for _, r in c_ddi.iterrows():
+            ddi_outliers.append({
+                "company_id": str(r["company_id"]),
+                "risk_number": int(r["risk_number"]),
+                "category": str(r["category"]),
+                "score": int(r["score"]),
+                "risk_snippet": str(r["risk_snippet"]),
+                "materiality_score": round(float(r["materiality_score"]), 2),
+                "emphasis_score": round(float(r["emphasis_score"]), 2),
+                "ddi_score": round(float(r["ddi_score"]), 2),
+            })
+
+    if OBFUSCATION_OUTLIERS_CSV.exists():
+        df_obf = pd.read_csv(OBFUSCATION_OUTLIERS_CSV)
+        c_obf = df_obf[df_obf["company_id"].str.strip().str.lower() == cid_target]
+        for _, r in c_obf.iterrows():
+            obf_outliers.append({
+                "company_id": str(r["company_id"]),
+                "risk_number": int(r["risk_number"]),
+                "category": str(r["category"]),
+                "score": int(r["score"]),
+                "risk_snippet": str(r["risk_snippet"]),
+                "readability_score": round(float(r["readability_score"]), 2),
+            })
+
+    return {
+        "company_id": company_id,
+        "ddi_outliers": ddi_outliers,
+        "obfuscation_outliers": obf_outliers,
+    }
+
 
 # =====================================================================
 # API ENDPOINTS
@@ -260,7 +397,7 @@ def read_root():
     return {
         "status": "online",
         "service": "IPO Prospectus Risk Decoder API",
-        "version": "1.0.0",
+        "version": "1.2.0",
         "documentation": "/docs",
     }
 
@@ -282,7 +419,7 @@ def get_companies():
 @app.get("/companies/{company_id}/risks", response_model=List[RiskItem])
 @app.get("/api/companies/{company_id}/risks", response_model=List[RiskItem])
 def get_company_risks(company_id: str):
-    """Returns full risk factor list for a company with severity scores and reasoning."""
+    """Returns full risk factor list for a company with severity scores, reasoning, DDI, and readability metrics."""
     company = find_company_by_id(company_id)
     if not company:
         raise HTTPException(
@@ -297,7 +434,7 @@ def get_company_risks(company_id: str):
 @app.get("/companies/{company_id}/summary", response_model=CompanySummary)
 @app.get("/api/companies/{company_id}/summary", response_model=CompanySummary)
 def get_company_summary(company_id: str):
-    """Returns category breakdown counts, average severity, and cross-company peer benchmark stats."""
+    """Returns category breakdown counts, average severity, litigation load, obfuscation test, and DDI summary metrics."""
     company = find_company_by_id(company_id)
     if not company:
         raise HTTPException(
@@ -322,6 +459,8 @@ def get_company_summary(company_id: str):
     peer_stats = fetch_peer_stats_for_company(company_id)
     industry_summary = fetch_industry_summary_for_company(company_id)
     litigation_summary = fetch_litigation_summary_for_company(company_id)
+    obfuscation = fetch_obfuscation_summary_for_company(company_id)
+    ddi = fetch_ddi_summary_for_company(company_id, risks)
 
     return {
         "company": company,
@@ -336,6 +475,8 @@ def get_company_summary(company_id: str):
         "peer_comparison": peer_stats,
         "industry_summary": industry_summary,
         "litigation_summary": litigation_summary,
+        "obfuscation": obfuscation,
+        "ddi": ddi,
     }
 
 
@@ -354,8 +495,21 @@ def get_company_litigation(company_id: str):
     return litigation_cases
 
 
+# Endpoint 5: GET /companies/{id}/outliers
+@app.get("/companies/{company_id}/outliers", response_model=CompanyOutliers)
+@app.get("/api/companies/{company_id}/outliers", response_model=CompanyOutliers)
+def get_company_outliers(company_id: str):
+    """Returns top DDI outliers and top obfuscation outliers for a company."""
+    company = find_company_by_id(company_id)
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with ID '{company_id}' not found. Available companies: {', '.join([c['company_id'] for c in get_companies_list()])}",
+        )
+    return fetch_outliers_for_company(company_id)
 
-# Endpoint 4: GET /methodology
+
+# Endpoint 6: GET /methodology
 @app.get("/methodology")
 @app.get("/api/methodology")
 def get_methodology():
@@ -403,4 +557,3 @@ def get_methodology():
             )
         }
     }
-
