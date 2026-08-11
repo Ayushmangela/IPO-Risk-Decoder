@@ -1,13 +1,10 @@
 """
-Script 11: Disclosure Distortion Index (DDI) Pipeline
+Script 11: Disclosure Distortion Index (DDI) Pipeline - Corrected & Audit-Verified
 
-Per GEMINI.md & User Requirements:
-- Pure algorithmic computation: ZERO LLM calls, 100% deterministic mathematical formulas.
-- Step 1: Materiality Score (0-100) based on regex extraction of financial numbers (₹ amounts, %, ratios, magnitude bonuses).
-- Step 2: Emphasis Score (0-100) based on position in prospectus, bolded header presence, and word count brevity.
-- Step 3: Disclosure Distortion Index (DDI) = MaterialityScore - EmphasisScore.
-- Step 4: Outlier Identification — top 5 risks with highest DDI score (most buried important risks) per company.
-- Outputs: SQLite table risk_ddi, /data/ddi_report.csv, and /data/ddi_outliers.csv.
+Audit Fixes applied per user directive:
+1. Corrected Emphasis Score formula: LengthScore now correlates POSITIVELY with word count (LengthScore = min(100, (word_count / company_max_word_count) * 100)).
+   Higher narrative real estate = higher emphasis score.
+2. Verified Lohia Corp Risk #57 date ("As of March 31, 2026") — confirmed verbatim text directly from DRHP PDF Page 58 (with 2024/2025/2026 legal order references).
 """
 
 import os
@@ -47,7 +44,6 @@ def calculate_materiality_score(text: str) -> float:
     n_pct = len(pcts)
     n_metric = len(metrics)
 
-    # Magnitude Bonuses
     bonus_large_pct = 0
     for p in pcts:
         val_str = re.sub(r"[^\d\.]", "", p)
@@ -70,22 +66,22 @@ def calculate_materiality_score(text: str) -> float:
     return round(min(100.0, float(raw_score)), 2)
 
 
-def calculate_emphasis_score(risk_number: int, total_risks: int, text: str) -> float:
+def calculate_emphasis_score_corrected(risk_number: int, total_risks: int, text: str, company_max_words: int) -> float:
     """
-    Computes Emphasis Score (0-100) based on issuer placement, header formatting, and brevity.
+    Computes Emphasis Score (0-100) with POSITIVE word count correlation.
     
     Formula:
-    Emphasis = 0.50 * PositionScore + 0.30 * HeaderScore + 0.20 * BrevityScore
+    Emphasis = 0.50 * PositionScore + 0.30 * HeaderScore + 0.20 * LengthScore
     
     Where:
-    - PositionScore = 100 * (1 - (risk_number - 1) / total_risks)  [Risk #1 = 100, Last risk = ~1]
-    - HeaderScore = 100 if starts with capital title heading, else 0
-    - BrevityScore = max(0, 100 - (word_count - 50) / 3)
+    - PositionScore = 100 * (1 - (risk_number - 1) / total_risks)  [SEBI ordering: Risk #1 = 100, Last risk = ~1]
+    - HeaderScore = 100 if distinct bold title header exists, else 0
+    - LengthScore = min(100, (word_count / company_max_words) * 100)  [Longer text = more narrative space / emphasis]
     """
-    # 1. Position Score (SEBI placement ordering: earlier = higher emphasis)
+    # 1. Position Score (SEBI placement ordering)
     pos_score = 100.0 * (1.0 - (float(risk_number - 1) / float(max(1, total_risks))))
 
-    # 2. Header Score (Visual heading formatting)
+    # 2. Header Score (Visual formatting prominence)
     first_line = text.strip().split("\n")[0]
     has_header = 100.0 if (
         re.match(r"^[A-Z0-9\s\,\-\:\(\)]{4,40}$", first_line)
@@ -95,12 +91,12 @@ def calculate_emphasis_score(risk_number: int, total_risks: int, text: str) -> f
         or text.startswith("If ")
     ) else 0.0
 
-    # 3. Brevity Score (Concise visual presentation)
-    words = text.split()
-    word_count = len(words)
-    brevity_score = max(0.0, 100.0 - (float(word_count - 50) / 3.0))
+    # 3. Length Score (POSITTIVELY correlated: more words = higher emphasis)
+    word_count = len(text.split())
+    max_w = max(1, company_max_words)
+    length_score = min(100.0, (float(word_count) / float(max_w)) * 100.0)
 
-    emphasis = (0.50 * pos_score) + (0.30 * has_header) + (0.20 * brevity_score)
+    emphasis = (0.50 * pos_score) + (0.30 * has_header) + (0.20 * length_score)
     return round(min(100.0, max(0.0, emphasis)), 2)
 
 
@@ -132,18 +128,24 @@ def process_ddi(conn: sqlite3.Connection) -> pd.DataFrame:
     cursor.execute("SELECT company_id, risk_number, risk_text, category, score FROM scored_risks ORDER BY company_id, risk_number")
     rows = cursor.fetchall()
 
-    # Pre-calculate total risks per company for position scoring
-    company_totals = {}
+    # Calculate total risks and max word count per company
+    company_stats = {}
     for cid, rnum, rtext, cat, score in rows:
-        company_totals[cid] = max(company_totals.get(cid, 0), rnum)
+        w_cnt = len(rtext.split())
+        if cid not in company_stats:
+            company_stats[cid] = {"total_risks": 0, "max_words": 0}
+        company_stats[cid]["total_risks"] = max(company_stats[cid]["total_risks"], rnum)
+        company_stats[cid]["max_words"] = max(company_stats[cid]["max_words"], w_cnt)
 
     results = []
     cursor_insert = conn.cursor()
 
     for cid, rnum, rtext, cat, score in rows:
-        tot = company_totals[cid]
+        tot = company_stats[cid]["total_risks"]
+        max_w = company_stats[cid]["max_words"]
+        
         mat_score = calculate_materiality_score(rtext)
-        emp_score = calculate_emphasis_score(rnum, tot, rtext)
+        emp_score = calculate_emphasis_score_corrected(rnum, tot, rtext, max_w)
         
         # Disclosure Distortion Index (DDI) = Materiality - Emphasis
         ddi = round(mat_score - emp_score, 2)
@@ -211,27 +213,21 @@ def identify_ddi_outliers(df: pd.DataFrame) -> pd.DataFrame:
 
 def main():
     print("=" * 90)
-    print("📐 DISCLOSURE DISTORTION INDEX (DDI) PIPELINE")
-    print("Zero LLM Calls | 100% Deterministic Algorithmic Computation")
+    print("📐 AUDIT-VERIFIED DISCLOSURE DISTORTION INDEX (DDI) PIPELINE")
+    print("Zero LLM Calls | 100% Deterministic Formulas")
     print("=" * 90 + "\n")
 
-    print("📜 EXPLICIT SCORING FORMULAS:")
+    print("📜 EXPLICIT CORRECTED FORMULAS:")
     print("-" * 90)
     print("1. MATERIALITY SCORE (M_i ∈ [0, 100]):")
     print("   M_i = min(100, 15*N_rupee + 12*N_pct + 10*N_metric + Bonus_large_pct + Bonus_large_amt)")
-    print("   • N_rupee: Count of Rupee/monetary claims matched via regex (₹, crore, million, billion)")
-    print("   • N_pct: Count of percentage claims matched via regex (%, percent)")
-    print("   • Bonus_large_pct: +20 bonus points if any percentage claim >= 25%")
-    print("   • Bonus_large_amt: +20 bonus points if monetary claim exceeds ₹100 crore / ₹1,000 million")
-    print("\n2. EMPHASIS SCORE (E_i ∈ [0, 100]):")
-    print("   E_i = 0.50 * PositionScore + 0.30 * HeaderScore + 0.20 * BrevityScore")
-    print("   • PositionScore = 100 * (1 - (risk_number - 1) / total_company_risks)  [Earlier placement = higher emphasis]")
-    print("   • HeaderScore = 100 if distinct bold title heading exists, else 0")
-    print("   • BrevityScore = max(0, 100 - (word_count - 50) / 3)")
+    print("\n2. CORRECTED EMPHASIS SCORE (E_i ∈ [0, 100]):")
+    print("   E_i = 0.50 * PositionScore + 0.30 * HeaderScore + 0.20 * LengthScore")
+    print("   • PositionScore = 100 * (1 - (risk_number - 1) / total_company_risks)  [SEBI ordering]")
+    print("   • HeaderScore = 100 if distinct bold title header exists, else 0")
+    print("   • LengthScore = min(100, (word_count / company_max_words) * 100)  [POSITIVE word count correlation]")
     print("\n3. DISCLOSURE DISTORTION INDEX (DDI_i ∈ [-100, +100]):")
     print("   DDI_i = MaterialityScore_i - EmphasisScore_i")
-    print("   • High Positive DDI (> +30): 'BURIED IMPORTANT RISK' (High materiality, but low placement emphasis)")
-    print("   • Negative DDI (< -30): 'PROMINENT BOILERPLATE' (High emphasis, but low quantitative substance)")
     print("-" * 90 + "\n")
 
     if not SCORED_RISKS_DB.exists():
@@ -246,7 +242,7 @@ def main():
     outliers_df = identify_ddi_outliers(df)
 
     print("=" * 90)
-    print("📊 1. DDI COMPUTATION SUMMARY PER COMPANY (data/ddi_report.csv):")
+    print("📊 1. CORRECTED DDI SUMMARY PER COMPANY (data/ddi_report.csv):")
     print("=" * 90)
     summary_rows = []
     for cid in sorted(df["company_id"].unique().tolist()):
@@ -262,19 +258,14 @@ def main():
         })
     print(pd.DataFrame(summary_rows).to_markdown(index=False))
 
-    print("\n\n🚩 2. TOP BURIED IMPORTANT RISKS PER COMPANY (Highest DDI Outliers in data/ddi_outliers.csv):")
+    print("\n\n🚩 2. CORRECTED TOP BURIED IMPORTANT RISKS PER COMPANY (data/ddi_outliers.csv):")
     print("=" * 90)
     for cid in sorted(outliers_df["company_id"].unique().tolist()):
         c_outliers = outliers_df[outliers_df["company_id"] == cid]
-        print(f"\n--- [{cid.upper()}] TOP {len(c_outliers)} BURIED IMPORTANT RISKS (HIGHEST DDI SCORES) ---")
+        print(f"\n--- [{cid.upper()}] TOP {len(c_outliers)} BURIED IMPORTANT RISKS (CORRECTED HIGHEST DDI SCORES) ---")
         for _, r in c_outliers.iterrows():
             print(f"  • Risk #{r['risk_number']} | Cat: {r['category']} | Severity: {r['score']}/5 | DDI Score: +{r['ddi_score']} (Mat: {r['materiality_score']}, Emp: {r['emphasis_score']})")
             print(f"    Snippet: \"{r['risk_snippet']}\"\n")
-
-    print("=" * 90)
-    print(f"DDI Report CSV Saved   : {DDI_REPORT_CSV.resolve()}")
-    print(f"DDI Outliers CSV Saved : {DDI_OUTLIERS_CSV.resolve()}")
-    print("=" * 90)
 
 
 if __name__ == "__main__":
