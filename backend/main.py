@@ -23,11 +23,14 @@ DATA_DIR = BASE_DIR / "data"
 SCORED_RISKS_DB = DATA_DIR / "scored_risks.db"
 COMPANIES_CSV = DATA_DIR / "companies.csv"
 PEER_STATS_CSV = DATA_DIR / "peer_stats.csv"
+INDUSTRY_SUMMARIES_CSV = DATA_DIR / "industry_summaries.csv"
+LITIGATION_SUMMARY_CSV = DATA_DIR / "litigation_summary.csv"
+
 
 app = FastAPI(
     title="IPO Prospectus Risk Decoder API",
-    description="FastAPI service serving pre-computed IPO DRHP risk factor analysis, severity scores, and peer benchmarking.",
-    version="1.0.0",
+    description="FastAPI service serving pre-computed IPO DRHP risk factor analysis, severity scores, litigation load, and peer benchmarking.",
+    version="1.1.0",
 )
 
 # Enable CORS for React frontend (Vite default port 5173 and localhost)
@@ -59,12 +62,33 @@ class RiskItem(BaseModel):
     reasoning: str
 
 
+class LitigationCaseItem(BaseModel):
+    company_id: str
+    case_id: int
+    party_type: str
+    case_text: str
+    category: str
+    reasoning: str
+
+
 class CategoryPeerStat(BaseModel):
     category: str
     count: int
     company_pct: float
     all_company_avg_pct: float
     difference: float
+
+
+class LitigationSummary(BaseModel):
+    total_cases: int
+    criminal_count: int
+    civil_count: int
+    tax_count: int
+    regulatory_count: int
+    other_count: int
+    category_counts: Dict[str, int]
+    party_type_breakdown: Dict[str, int]
+    has_director_or_promoter_litigation: bool
 
 
 class CompanySummary(BaseModel):
@@ -75,6 +99,8 @@ class CompanySummary(BaseModel):
     comparison_mode: str
     comparison_notice: str
     peer_comparison: List[CategoryPeerStat]
+    industry_summary: Optional[str] = None
+    litigation_summary: Optional[LitigationSummary] = None
 
 
 # =====================================================================
@@ -131,6 +157,42 @@ def fetch_risks_for_company(company_id: str) -> List[Dict]:
     return result
 
 
+def fetch_litigation_for_company(company_id: str) -> List[Dict]:
+    """Fetches litigation cases from SQLite litigation_scores table."""
+    if not SCORED_RISKS_DB.exists():
+        return []
+
+    conn = sqlite3.connect(SCORED_RISKS_DB)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT company_id, case_id, party_type, case_text, category, reasoning 
+            FROM litigation_scores 
+            WHERE LOWER(company_id) = ? 
+            ORDER BY case_id ASC
+            """,
+            (company_id.strip().lower(),),
+        )
+        rows = cursor.fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    finally:
+        conn.close()
+
+    result = []
+    for r in rows:
+        result.append({
+            "company_id": r[0],
+            "case_id": r[1],
+            "party_type": r[2],
+            "case_text": r[3],
+            "category": r[4],
+            "reasoning": r[5],
+        })
+    return result
+
+
 def fetch_peer_stats_for_company(company_id: str) -> List[Dict]:
     """Fetches pre-computed peer stats from data/peer_stats.csv."""
     if not PEER_STATS_CSV.exists():
@@ -138,6 +200,55 @@ def fetch_peer_stats_for_company(company_id: str) -> List[Dict]:
     df = pd.read_csv(PEER_STATS_CSV)
     c_df = df[df["company_id"].str.strip().str.lower() == company_id.strip().lower()]
     return c_df.to_dict(orient="records")
+
+
+def fetch_industry_summary_for_company(company_id: str) -> str:
+    """Fetches industry overview summary from data/industry_summaries.csv."""
+    if not INDUSTRY_SUMMARIES_CSV.exists():
+        return ""
+    df = pd.read_csv(INDUSTRY_SUMMARIES_CSV)
+    c_df = df[df["company_id"].str.strip().str.lower() == company_id.strip().lower()]
+    if not c_df.empty and "summary_text" in c_df.columns:
+        return str(c_df.iloc[0]["summary_text"])
+    return ""
+
+
+def fetch_litigation_summary_for_company(company_id: str) -> Dict:
+    """Computes litigation load summary stats and party type breakdown."""
+    cases = fetch_litigation_for_company(company_id)
+    total_cases = len(cases)
+
+    cat_counts = {"Criminal": 0, "Civil": 0, "Tax": 0, "Regulatory/SEBI": 0, "Other": 0}
+    party_counts = {"company": 0, "director": 0, "promoter": 0}
+    has_dir_promoter = False
+
+    for c in cases:
+        cat = c.get("category", "Other")
+        if cat not in cat_counts:
+            cat = "Other"
+        cat_counts[cat] += 1
+
+        ptype = str(c.get("party_type", "company")).strip().lower()
+        if ptype in party_counts:
+            party_counts[ptype] += 1
+        else:
+            party_counts["company"] += 1
+
+        if ptype in ["director", "promoter"]:
+            has_dir_promoter = True
+
+    return {
+        "total_cases": total_cases,
+        "criminal_count": cat_counts["Criminal"],
+        "civil_count": cat_counts["Civil"],
+        "tax_count": cat_counts["Tax"],
+        "regulatory_count": cat_counts["Regulatory/SEBI"],
+        "other_count": cat_counts["Other"],
+        "category_counts": cat_counts,
+        "party_type_breakdown": party_counts,
+        "has_director_or_promoter_litigation": has_dir_promoter,
+    }
+
 
 
 # =====================================================================
@@ -209,6 +320,8 @@ def get_company_summary(company_id: str):
         category_counts[cat] = category_counts.get(cat, 0) + 1
 
     peer_stats = fetch_peer_stats_for_company(company_id)
+    industry_summary = fetch_industry_summary_for_company(company_id)
+    litigation_summary = fetch_litigation_summary_for_company(company_id)
 
     return {
         "company": company,
@@ -221,7 +334,25 @@ def get_company_summary(company_id: str):
             "Metrics represent a cross-company dataset comparison baseline rather than same-sector peer comparison."
         ),
         "peer_comparison": peer_stats,
+        "industry_summary": industry_summary,
+        "litigation_summary": litigation_summary,
     }
+
+
+# Endpoint 4: GET /companies/{id}/litigation
+@app.get("/companies/{company_id}/litigation", response_model=List[LitigationCaseItem])
+@app.get("/api/companies/{company_id}/litigation", response_model=List[LitigationCaseItem])
+def get_company_litigation(company_id: str):
+    """Returns full list of litigation cases for a company (case_text, party_type, category, reasoning)."""
+    company = find_company_by_id(company_id)
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with ID '{company_id}' not found. Available companies: {', '.join([c['company_id'] for c in get_companies_list()])}",
+        )
+    litigation_cases = fetch_litigation_for_company(company_id)
+    return litigation_cases
+
 
 
 # Endpoint 4: GET /methodology

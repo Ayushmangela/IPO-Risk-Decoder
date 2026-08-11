@@ -33,15 +33,22 @@ export default function App() {
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [risks, setRisks] = useState([]);
+  const [litigationCases, setLitigationCases] = useState([]);
   const [methodologyData, setMethodologyData] = useState(null);
   
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingRisks, setLoadingRisks] = useState(false);
+  const [loadingLitigation, setLoadingLitigation] = useState(false);
   
-  // Drill-down filters & expansion
+  // Drill-down filter & tab states
+  const [drillDownTab, setDrillDownTab] = useState('risks'); // 'risks' | 'litigation'
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRiskId, setExpandedRiskId] = useState(null);
+
+  const [litigationCategoryFilter, setLitigationCategoryFilter] = useState('ALL');
+  const [litigationSearchQuery, setLitigationSearchQuery] = useState('');
+  const [expandedLitigationId, setExpandedLitigationId] = useState(null);
 
   // 1. Fetch Companies & Methodology on Load
   useEffect(() => {
@@ -61,15 +68,19 @@ export default function App() {
       .catch((err) => console.error('Error fetching methodology:', err));
   }, []);
 
-  // 2. Fetch Summary & Risks when selectedCompanyId changes
+  // 2. Fetch Summary, Risks & Litigation when selectedCompanyId changes
   useEffect(() => {
     if (!selectedCompanyId) return;
 
     setLoadingSummary(true);
     setLoadingRisks(true);
+    setLoadingLitigation(true);
     setCategoryFilter('ALL');
+    setLitigationCategoryFilter('ALL');
     setSearchQuery('');
+    setLitigationSearchQuery('');
     setExpandedRiskId(null);
+    setExpandedLitigationId(null);
 
     // Fetch Summary
     fetch(`${API_BASE_URL}/companies/${selectedCompanyId}/summary`)
@@ -93,6 +104,18 @@ export default function App() {
       .catch((err) => {
         console.error('Error fetching risks:', err);
         setLoadingRisks(false);
+      });
+
+    // Fetch Litigation Cases
+    fetch(`${API_BASE_URL}/companies/${selectedCompanyId}/litigation`)
+      .then((res) => res.json())
+      .then((data) => {
+        setLitigationCases(data);
+        setLoadingLitigation(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching litigation cases:', err);
+        setLoadingLitigation(false);
       });
   }, [selectedCompanyId]);
 
@@ -128,6 +151,18 @@ export default function App() {
       r.reasoning.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCat && matchesSearch;
   });
+
+  // Filter Litigation Cases
+  const filteredLitigation = litigationCases.filter((c) => {
+    const matchesCat =
+      litigationCategoryFilter === 'ALL' ||
+      c.category.toUpperCase() === litigationCategoryFilter.toUpperCase();
+    const matchesSearch =
+      c.case_text.toLowerCase().includes(litigationSearchQuery.toLowerCase()) ||
+      c.reasoning.toLowerCase().includes(litigationSearchQuery.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
+
 
   return (
     <div className="app-layout">
@@ -199,6 +234,21 @@ export default function App() {
             {/* SECTION 2: Company Dashboard & Charts */}
             {selectedCompany && summaryData && (
               <section className="section-block mb-8">
+                {/* 1. Industry Context Card */}
+                {summaryData.industry_summary && (
+                  <div className="industry-context-card">
+                    <div className="industry-header">
+                      <div className="industry-title-group">
+                        <BookOpen size={20} />
+                        <span>Industry Context & Sector Overview</span>
+                      </div>
+                      <span className="company-sector-badge">{selectedCompany.sector} Sector</span>
+                    </div>
+                    <p className="industry-text-body">{summaryData.industry_summary}</p>
+                  </div>
+                )}
+
+                {/* Metrics Row */}
                 <div className="metrics-row">
                   <div className="metric-card">
                     <div className="metric-icon-box">
@@ -230,6 +280,75 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* 2. Litigation Load Section */}
+                {summaryData.litigation_summary && (
+                  <div className="litigation-load-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <h3 className="card-title" style={{ margin: 0 }}>
+                        <ShieldAlert size={18} color="#ef4444" />
+                        Litigation Load & Legal Exposure ({summaryData.litigation_summary.total_cases} Total Cases Disclosed)
+                      </h3>
+                      <span className="badge badge-score-4">
+                        {summaryData.litigation_summary.total_cases} Pending Case Disclosures
+                      </span>
+                    </div>
+
+                    {/* Director / Promoter Warning Flag */}
+                    {summaryData.litigation_summary.has_director_or_promoter_litigation && (
+                      <div className="director-warning-banner">
+                        <AlertTriangle size={18} />
+                        <div>
+                          <strong>⚠️ Director / Promoter Named in Litigation</strong>: One or more legal proceedings individually name company Directors or Promoters, representing heightened personal and managerial risk exposure.
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="litigation-grid">
+                      {/* Subcard 1: Party Type Breakdown */}
+                      <div className="lit-subcard">
+                        <div className="lit-subcard-title">
+                          <Building2 size={14} /> Party Type Exposure
+                        </div>
+                        <div className="party-pills-row">
+                          <span className="party-pill party-pill-company">
+                            Company: {summaryData.litigation_summary.party_type_breakdown.company || 0}
+                          </span>
+                          <span className="party-pill party-pill-director">
+                            Director: {summaryData.litigation_summary.party_type_breakdown.director || 0}
+                          </span>
+                          <span className="party-pill party-pill-promoter">
+                            Promoter: {summaryData.litigation_summary.party_type_breakdown.promoter || 0}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Subcard 2: Category Breakdown */}
+                      <div className="lit-subcard">
+                        <div className="lit-subcard-title">
+                          <FileText size={14} /> Category Breakdown
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171' }}>
+                            Criminal: {summaryData.litigation_summary.criminal_count}
+                          </span>
+                          <span className="badge" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc' }}>
+                            Civil: {summaryData.litigation_summary.civil_count}
+                          </span>
+                          <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.2)', color: '#facc15' }}>
+                            Tax: {summaryData.litigation_summary.tax_count}
+                          </span>
+                          <span className="badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6' }}>
+                            Regulatory/SEBI: {summaryData.litigation_summary.regulatory_count}
+                          </span>
+                          <span className="badge" style={{ background: 'rgba(100, 116, 139, 0.2)', color: '#94a3b8' }}>
+                            Other: {summaryData.litigation_summary.other_count}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Charts Row */}
                 <div className="charts-grid">
@@ -348,96 +467,198 @@ export default function App() {
               </section>
             )}
 
-            {/* SECTION 3: Risk Factor Drill-Down */}
+            {/* SECTION 3: Drill-Down Section (Risk Factors vs Litigation Cases) */}
             <section className="section-block">
               <div className="card">
-                <h2 className="card-title">
-                  <AlertTriangle size={18} color="#a5b4fc" />
-                  Risk Factors Drill-Down ({filteredRisks.length} Items)
-                </h2>
-
-                <div className="risk-filters">
-                  {/* Category Filter Tabs */}
-                  <div className="category-tabs">
-                    <button
-                      id="category-filter-all"
-                      className={`tab-btn ${categoryFilter === 'ALL' ? 'active' : ''}`}
-                      onClick={() => setCategoryFilter('ALL')}
-                    >
-                      All Categories ({risks.length})
-                    </button>
-                    {['Financial', 'Regulatory', 'Legal', 'Operational', 'Market', 'Reputational'].map((cat) => (
-                      <button
-                        key={cat}
-                        id={`category-filter-${cat.toLowerCase()}`}
-                        className={`tab-btn ${categoryFilter === cat ? 'active' : ''}`}
-                        onClick={() => setCategoryFilter(cat)}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Search Bar */}
-                  <input
-                    type="text"
-                    id="search-input"
-                    className="search-input"
-                    placeholder="Search risk text or reasoning..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+                {/* Drill-down Sub-Tab Navigation Header */}
+                <div className="drilldown-tab-group">
+                  <button
+                    id="drilldown-tab-risks"
+                    className={`drill-tab-btn ${drillDownTab === 'risks' ? 'active' : ''}`}
+                    onClick={() => setDrillDownTab('risks')}
+                  >
+                    <AlertTriangle size={16} />
+                    Risk Factors ({filteredRisks.length} Items)
+                  </button>
+                  <button
+                    id="drilldown-tab-litigation"
+                    className={`drill-tab-btn ${drillDownTab === 'litigation' ? 'active' : ''}`}
+                    onClick={() => setDrillDownTab('litigation')}
+                  >
+                    <FileText size={16} />
+                    Litigation Cases ({filteredLitigation.length} Items)
+                  </button>
                 </div>
 
-                {/* Risk List */}
-                <div className="risk-list">
-                  {filteredRisks.map((risk) => {
-                    const isExpanded = expandedRiskId === risk.risk_number;
-                    return (
-                      <div
-                        key={risk.risk_number}
-                        id={`risk-item-${risk.risk_number}`}
-                        className="risk-card"
-                        onClick={() => setExpandedRiskId(isExpanded ? null : risk.risk_number)}
-                      >
-                        <div className="risk-card-header">
-                          <div className="risk-badge-group">
-                            <span className="badge badge-cat">{risk.category}</span>
-                            <span className={`badge badge-score-${risk.score}`}>
-                              Severity {risk.score}/5 ({risk.score === 5 ? 'Severe' : risk.score === 4 ? 'High' : risk.score === 3 ? 'Moderate' : 'Low'})
-                            </span>
-                          </div>
-                          <div style={{ color: '#94a3b8' }}>
-                            {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                          </div>
-                        </div>
-
-                        <p className="risk-snippet">
-                          <strong>Risk #{risk.risk_number}:</strong> {risk.risk_text}
-                        </p>
-
-                        {/* LLM Reasoning Field (Expanded) */}
-                        {isExpanded && (
-                          <div className="risk-reasoning-box">
-                            <div className="reasoning-title">
-                              <CheckCircle2 size={14} />
-                              LLM Audit Reasoning
-                            </div>
-                            <p>{risk.reasoning}</p>
-                          </div>
-                        )}
+                {/* TAB 1: RISK FACTORS DRILL DOWN */}
+                {drillDownTab === 'risks' && (
+                  <>
+                    <div className="risk-filters">
+                      {/* Category Filter Tabs */}
+                      <div className="category-tabs">
+                        <button
+                          id="category-filter-all"
+                          className={`tab-btn ${categoryFilter === 'ALL' ? 'active' : ''}`}
+                          onClick={() => setCategoryFilter('ALL')}
+                        >
+                          All Categories ({risks.length})
+                        </button>
+                        {['Financial', 'Regulatory', 'Legal', 'Operational', 'Market', 'Reputational'].map((cat) => (
+                          <button
+                            key={cat}
+                            id={`category-filter-${cat.toLowerCase()}`}
+                            className={`tab-btn ${categoryFilter === cat ? 'active' : ''}`}
+                            onClick={() => setCategoryFilter(cat)}
+                          >
+                            {cat}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  })}
 
-                  {filteredRisks.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                      No risk factors found matching the selected filter.
+                      {/* Search Bar */}
+                      <input
+                        type="text"
+                        id="search-input"
+                        className="search-input"
+                        placeholder="Search risk text or reasoning..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
                     </div>
-                  )}
-                </div>
+
+                    {/* Risk List */}
+                    <div className="risk-list">
+                      {filteredRisks.map((risk) => {
+                        const isExpanded = expandedRiskId === risk.risk_number;
+                        return (
+                          <div
+                            key={risk.risk_number}
+                            id={`risk-item-${risk.risk_number}`}
+                            className="risk-card"
+                            onClick={() => setExpandedRiskId(isExpanded ? null : risk.risk_number)}
+                          >
+                            <div className="risk-card-header">
+                              <div className="risk-badge-group">
+                                <span className="badge badge-cat">{risk.category}</span>
+                                <span className={`badge badge-score-${risk.score}`}>
+                                  Severity {risk.score}/5 ({risk.score === 5 ? 'Severe' : risk.score === 4 ? 'High' : risk.score === 3 ? 'Moderate' : 'Low'})
+                                </span>
+                              </div>
+                              <div style={{ color: '#94a3b8' }}>
+                                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                              </div>
+                            </div>
+
+                            <p className="risk-snippet">
+                              <strong>Risk #{risk.risk_number}:</strong> {risk.risk_text}
+                            </p>
+
+                            {/* LLM Reasoning Field (Expanded) */}
+                            {isExpanded && (
+                              <div className="risk-reasoning-box">
+                                <div className="reasoning-title">
+                                  <CheckCircle2 size={14} />
+                                  LLM Audit Reasoning
+                                </div>
+                                <p>{risk.reasoning}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {filteredRisks.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                          No risk factors found matching the selected filter.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* TAB 2: LITIGATION CASES DRILL DOWN */}
+                {drillDownTab === 'litigation' && (
+                  <>
+                    <div className="risk-filters">
+                      {/* Category Filter Tabs for Litigation */}
+                      <div className="category-tabs">
+                        {['ALL', 'Criminal', 'Civil', 'Tax', 'Regulatory/SEBI', 'Other'].map((cat) => (
+                          <button
+                            key={cat}
+                            id={`lit-cat-filter-${cat.toLowerCase().replace('/', '-')}`}
+                            className={`tab-btn ${litigationCategoryFilter === cat ? 'active' : ''}`}
+                            onClick={() => setLitigationCategoryFilter(cat)}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Search Bar for Litigation */}
+                      <input
+                        type="text"
+                        id="litigation-search-input"
+                        className="search-input"
+                        placeholder="Search litigation case text or reasoning..."
+                        value={litigationSearchQuery}
+                        onChange={(e) => setLitigationSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Litigation List */}
+                    <div className="risk-list">
+                      {filteredLitigation.map((lit) => {
+                        const isExpanded = expandedLitigationId === lit.case_id;
+                        return (
+                          <div
+                            key={lit.case_id}
+                            id={`lit-case-item-${lit.case_id}`}
+                            className="risk-card"
+                            onClick={() => setExpandedLitigationId(isExpanded ? null : lit.case_id)}
+                          >
+                            <div className="risk-card-header">
+                              <div className="risk-badge-group">
+                                <span
+                                  className={`party-pill party-pill-${lit.party_type.toLowerCase()}`}
+                                >
+                                  {lit.party_type.toUpperCase()}
+                                </span>
+                                <span className="badge badge-cat">{lit.category}</span>
+                              </div>
+                              <div style={{ color: '#94a3b8' }}>
+                                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                              </div>
+                            </div>
+
+                            <p className="risk-snippet">
+                              <strong>Case #{lit.case_id}:</strong> {lit.case_text}
+                            </p>
+
+                            {/* LLM Legal Exposure Reasoning Field (Expanded) */}
+                            {isExpanded && (
+                              <div className="risk-reasoning-box" style={{ borderLeftColor: '#ec4899' }}>
+                                <div className="reasoning-title" style={{ color: '#ec4899' }}>
+                                  <ShieldAlert size={14} />
+                                  LLM Legal Exposure Audit & Reasoning
+                                </div>
+                                <p>{lit.reasoning}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {filteredLitigation.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                          No litigation cases found matching the selected filter.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </section>
+
           </>
         )}
 

@@ -430,3 +430,154 @@ body {
   align-items: center;
   gap: 0.35rem;
 }
+
+/* Industry Context Card */
+.industry-context-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.15);
+  margin-bottom: 1.75rem;
+}
+
+.industry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.industry-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #a5b4fc;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.industry-text-body {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+
+/* Director / Promoter Warning Banner */
+.director-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #f87171;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+}
+
+/* Litigation Load Section */
+.litigation-load-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.litigation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.lit-subcard {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.lit-subcard-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.party-pills-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.party-pill {
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.party-pill-company {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.party-pill-director {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.party-pill-promoter {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.4);
+}
+
+/* Sub-Tab Selector for Drilldown */
+.drilldown-tab-group {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.75rem;
+}
+
+.drill-tab-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.drill-tab-btn:hover {
+  border-color: var(--border-highlight);
+  color: var(--text-main);
+}
+
+.drill-tab-btn.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: var(--primary);
+  color: #a5b4fc;
+}
+
