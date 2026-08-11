@@ -1,0 +1,4 @@
+company_id,has_identifiable_promoter,promoter_names,source_page,verbatim_disclosure
+paytm,No,None (Professionally Managed Company),PDF Page 1 / Page 28,OUR COMPANY IS A PROFESSIONALLY MANAGED COMPANY AND DOES NOT HAVE AN IDENTIFIABLE PROMOTER
+lohiacorp,Yes,"Raj Kumar Lohia, Gaurav Lohia, Ritu Lohia",PDF Page 3 / Page 4 / Page 7,"Raj Kumar Lohia and Gaurav Lohia (Promoter Selling Shareholders), Ritu Lohia (Promoter Group Selling Shareholder)"
+zomato,No,None (Professionally Managed Company),PDF Page 1 / Page 29 / Page 63,OUR COMPANY IS A PROFESSIONALLY MANAGED COMPANY AND DOES NOT HAVE AN IDENTIFIABLE PROMOTER IN TERMS OF THE SEBI ICDR REGULATIONS
