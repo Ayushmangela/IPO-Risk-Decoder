@@ -1,0 +1,5 @@
+company_id,spearman_correlation,p_value,sample_size,interpretation
+lohiacorp,0.0984,0.3643,87,no significant correlation
+paytm,0.2016,0.0711,81,no significant correlation
+zomato,0.2485,0.0477,64,significant positive correlation — contradicts obfuscation hypothesis
+combined_all,0.1826,0.0053,232,significant positive correlation — contradicts obfuscation hypothesis
