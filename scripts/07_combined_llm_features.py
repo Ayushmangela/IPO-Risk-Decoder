@@ -143,10 +143,11 @@ def extract_company_sections_uncapped(company_id: str, cfg: dict):
 # STEP 2: ONE COMBINED LLM CALL PER COMPANY
 # =====================================================================
 
-def run_combined_llm_call(extracted: dict, cfg: dict, backend: str = "gemini"):
+def run_combined_llm_call(extracted: dict, backend: str = "gemini"):
     """
     Executes EXACTLY ONE combined LLM call per company across ALL uncapped litigation items + industry text.
     """
+
     cid = extracted["company_id"]
     cname = extracted["company_name"]
     cases = extracted["cases"]
