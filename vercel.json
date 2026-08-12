@@ -19,14 +19,6 @@
       "dest": "api/index.py"
     },
     {
-      "src": "/companies/(.*)",
-      "dest": "api/index.py"
-    },
-    {
-      "src": "/companies",
-      "dest": "api/index.py"
-    },
-    {
       "src": "/assets/(.*)",
       "dest": "frontend/assets/$1"
     },

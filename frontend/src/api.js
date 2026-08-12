@@ -84,33 +84,75 @@ export const STATIC_METHODOLOGY_DATA = {
 };
 
 export async function fetchCompanies() {
-  const res = await fetch(`${API_BASE_URL}/companies`);
+  const res = await fetch(`${API_BASE_URL}/api/companies`);
   if (!res.ok) throw new Error('Failed to fetch companies');
   return res.json();
 }
 
 export async function fetchCompanySummary(companyId) {
-  const res = await fetch(`${API_BASE_URL}/companies/${companyId}/summary`);
+  const res = await fetch(`${API_BASE_URL}/api/companies/${companyId}/summary`);
   if (!res.ok) throw new Error('Failed to fetch summary');
   return res.json();
 }
 
 export async function fetchCompanyOutliers(companyId) {
-  const res = await fetch(`${API_BASE_URL}/companies/${companyId}/outliers`);
+  const res = await fetch(`${API_BASE_URL}/api/companies/${companyId}/outliers`);
   if (!res.ok) throw new Error('Failed to fetch outliers');
   return res.json();
 }
 
 export async function fetchCompanyRisks(companyId) {
-  const res = await fetch(`${API_BASE_URL}/companies/${companyId}/risks`);
+  const res = await fetch(`${API_BASE_URL}/api/companies/${companyId}/risks`);
   if (!res.ok) throw new Error('Failed to fetch risks');
   return res.json();
 }
 
 export async function fetchCompanyLitigation(companyId) {
-  const res = await fetch(`${API_BASE_URL}/companies/${companyId}/litigation`);
+  const res = await fetch(`${API_BASE_URL}/api/companies/${companyId}/litigation`);
   if (!res.ok) throw new Error('Failed to fetch litigation');
   return res.json();
+}
+
+export async function fetchActiveIpos() {
+  const res = await fetch(`${API_BASE_URL}/api/active-ipos`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || 'Failed to fetch active IPO list');
+  }
+  return res.json();
+}
+
+export async function refreshActiveIpos() {
+  const res = await fetch(`${API_BASE_URL}/api/active-ipos/refresh`, { method: 'POST' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || 'Failed to refresh active IPO list');
+  }
+  return res.json();
+}
+
+/** Uploads a DRHP PDF and runs the full pipeline synchronously. Throws an
+ * Error whose `.detail` carries the structured {failed_step, message, log}
+ * payload when the backend reports a specific pipeline-step failure. */
+export async function uploadDrhp(file, companyName, sector) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('company_name', companyName);
+  if (sector) formData.append('sector', sector);
+
+  const res = await fetch(`${API_BASE_URL}/api/upload-drhp`, {
+    method: 'POST',
+    body: formData,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(
+      typeof body.detail === 'string' ? body.detail : body.detail?.message || 'Upload failed'
+    );
+    err.detail = body.detail;
+    throw err;
+  }
+  return body;
 }
 
 export async function fetchMethodology() {
