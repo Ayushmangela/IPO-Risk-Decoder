@@ -392,7 +392,7 @@ def fetch_outliers_for_company(company_id: str) -> Dict:
 # API ENDPOINTS
 # =====================================================================
 
-@app.get("/")
+@app.get("/api")
 def read_root():
     return {
         "status": "online",
