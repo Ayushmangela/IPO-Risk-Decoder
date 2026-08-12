@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SquaresFour, ClipboardText, Scales, ChartBar, BookOpen } from '@phosphor-icons/react';
+import { SquaresFour, ClipboardText, Scales, ChartBar, BookOpen, PlusCircle } from '@phosphor-icons/react';
 import AppShell from './shell/AppShell';
 import CommandPalette from './composed/CommandPalette';
 import OverviewPanel from './features/OverviewPanel';
@@ -7,6 +7,7 @@ import RiskRegister from './features/RiskRegister';
 import LitigationDocket from './features/LitigationDocket';
 import BenchmarksPanel from './features/BenchmarksPanel';
 import MethodologyPanel from './features/MethodologyPanel';
+import AddCompanyPanel from './features/AddCompanyPanel';
 import {
   fetchCompanies,
   fetchCompanySummary,
@@ -22,6 +23,7 @@ const VIEWS = [
   { id: 'litigation', path: '/litigation', label: 'Litigation docket', short: 'Legal', icon: <Scales size={19} /> },
   { id: 'benchmarks', path: '/benchmarks', label: 'Benchmarks', short: 'Bench', icon: <ChartBar size={19} /> },
   { id: 'methodology', path: '/methodology', label: 'Methodology', short: 'Method', icon: <BookOpen size={19} /> },
+  { id: 'add-company', path: '/add-company', label: 'Add company', short: 'Add', icon: <PlusCircle size={19} /> },
 ];
 
 function viewForPath(pathname) {
@@ -59,6 +61,16 @@ export default function App() {
   const jumpToRisk = (riskNumber) => {
     setFocusRiskNumber(riskNumber);
     navigateTo('risks');
+  };
+
+  const handleCompanyAdded = (newCompanyId) => {
+    fetchCompanies()
+      .then((data) => {
+        setCompanies(data);
+        setSelectedCompanyId(newCompanyId);
+        navigateTo('overview');
+      })
+      .catch((err) => console.error('Error refreshing companies after upload:', err));
   };
 
   useEffect(() => {
@@ -184,6 +196,8 @@ export default function App() {
 
       {activeView === 'methodology' && <MethodologyPanel data={methodologyData} />}
 
+      {activeView === 'add-company' && <AddCompanyPanel onCompanyAdded={handleCompanyAdded} />}
+
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
@@ -216,6 +230,10 @@ const VIEW_COPY = {
   methodology: {
     title: 'Methodology',
     description: 'Scoring rubric, model validation results, and the deterministic audit formulas behind every score.',
+  },
+  'add-company': {
+    title: 'Add company',
+    description: 'Browse currently-filing mainboard IPOs, or upload a DRHP PDF to run the full analysis pipeline on demand.',
   },
 };
 
