@@ -14,6 +14,9 @@ env/
 # PDFs (stored locally)
 data/pdfs/*.pdf
 
+# Pre-run safety snapshots created by the upload pipeline (local-only, not deployment data)
+data/backups/
+
 # Node / React
 node_modules/
 frontend/node_modules/
