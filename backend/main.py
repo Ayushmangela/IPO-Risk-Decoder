@@ -513,7 +513,7 @@ def get_company_outliers(company_id: str):
 @app.get("/methodology")
 @app.get("/api/methodology")
 def get_methodology():
-    """Returns methodology details: severity rubric, LLM model validation benchmark, and dataset limitations."""
+    """Returns methodology details: severity rubric, LLM model validation benchmark, dataset limitations, and algorithmic formulas."""
     return {
         "rubric": {
             "scale": [
@@ -547,6 +547,42 @@ def get_methodology():
                 }
             ]
         },
+        "ddi_methodology": {
+            "title": "Disclosure Distortion Index (DDI)",
+            "formula": "DDI = Materiality Score - Emphasis Score",
+            "materiality_score": "M_i = min(100, 15*N_rupee + 12*N_pct + 10*N_metric + Bonus_large)",
+            "emphasis_score": "E_i = 0.50*PositionScore + 0.30*HeaderScore + 0.20*LengthScore",
+            "threshold": "DDI > +30.0 flags a 'Buried Important Risk' (high financial materiality, low placement emphasis).",
+            "range": "[-100.0 to +100.0]"
+        },
+        "obfuscation_methodology": {
+            "title": "Obfuscation Test (Flesch Readability vs Severity Correlation)",
+            "formula": "Spearman Rank Correlation (rho) between FRE Readability Score and Severity (1-5)",
+            "hypothesis": "Higher severity risks correlate with LOWER readability (harder to read).",
+            "per_company_results": [
+                {"company": "Zomato", "spearman_rho": 0.2485, "p_value": 0.0477, "significance": "Statistically Significant (p < 0.05)", "finding": "Contradicts obfuscation hypothesis — severe risks written in clearer prose."},
+                {"company": "Paytm", "spearman_rho": 0.2016, "p_value": 0.0711, "significance": "Borderline / Not Significant (p = 0.0711)", "finding": "No statistically significant correlation."},
+                {"company": "Lohia Corp", "spearman_rho": 0.0984, "p_value": 0.3643, "significance": "Not Significant (p = 0.3643)", "finding": "No correlation between severity and readability."},
+                {"company": "Combined Dataset (232 risks)", "spearman_rho": 0.1826, "p_value": 0.0053, "significance": "Statistically Significant (p = 0.0053)", "finding": "Contradicts obfuscation hypothesis across full dataset."}
+            ]
+        },
+        "shadow_ledger_methodology": {
+            "title": "Shadow Ledger Engine (Financial Statements Cross-Check)",
+            "cross_checked_figures": ["Total Revenue", "Profit After Tax (PAT)", "Total Debt / Borrowings"],
+            "equivalence_rules": [
+                "Only compare figures for the exact same fiscal year.",
+                "Only compare figures with identical accounting scope (Standalone vs Consolidated).",
+                "Only compare figures measuring the exact same defined financial metric.",
+                "Non-equivalent metrics (e.g. Sanctioned Credit Limits vs Balance Sheet Debt) are labeled 'Not Directly Comparable' with both values preserved."
+            ],
+            "confirmed_match_example": "Lohia Corp corporate guarantee of ₹413.00 Million on Page 323 Note 36 matched Risk #9 claim (₹413.00 Million, 0.0% difference)."
+        },
+        "proceeds_promoter_methodology": {
+            "title": "Use of Proceeds & Promoter Structure Analysis",
+            "execution": "100% Deterministic Extraction (Zero LLM Calls)",
+            "proceeds_extraction": "Parsed directly from 'Objects of the Offer' fund allocation tables in Section III/IV of the DRHP.",
+            "promoter_extraction": "Extracted from explicit cover page and 'Capital Structure / Our Promoters' disclosures."
+        },
         "limitations_notice": {
             "title": "Single-Company-Per-Sector Limitation Notice",
             "description": (
@@ -557,3 +593,4 @@ def get_methodology():
             )
         }
     }
+

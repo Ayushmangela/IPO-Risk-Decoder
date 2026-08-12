@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { 
   Building2, AlertTriangle, ShieldAlert, BarChart3, ChevronDown, ChevronUp, Search, Info, CheckCircle2,
-  BookOpen, CheckSquare, XCircle, Award, LayoutDashboard, FileText, AlertCircle, EyeOff
+  BookOpen, CheckSquare, XCircle, Award, LayoutDashboard, FileText, AlertCircle, EyeOff, Scale
 } from 'lucide-react';
 
 const API_BASE_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
@@ -30,7 +30,11 @@ const SEVERITY_COLORS = {
 };
 
 export default function App() {
-  const [activeScreen, setActiveScreen] = useState('dashboard'); // 'dashboard' | 'methodology'
+  const [activeScreen, setActiveScreen] = useState(() => {
+    return (typeof window !== 'undefined' && window.location.pathname.startsWith('/methodology'))
+      ? 'methodology'
+      : 'dashboard';
+  });
   
   const [companies, setCompanies] = useState([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
@@ -54,6 +58,29 @@ export default function App() {
   const [litigationSearchQuery, setLitigationSearchQuery] = useState('');
   const [expandedLitigationId, setExpandedLitigationId] = useState(null);
 
+  const navigateTo = (screen) => {
+    setActiveScreen(screen);
+    const targetPath = screen === 'methodology' ? '/methodology' : '/';
+    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
+      window.history.pushState({ screen }, '', targetPath);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        if (window.location.pathname.startsWith('/methodology')) {
+          setActiveScreen('methodology');
+        } else {
+          setActiveScreen('dashboard');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // 1. Fetch Companies & Methodology on Load
   useEffect(() => {
     fetch(`${API_BASE_URL}/companies`)
@@ -66,7 +93,7 @@ export default function App() {
       })
       .catch((err) => console.error('Error fetching companies:', err));
 
-    fetch(`${API_BASE_URL}/methodology`)
+    fetch(`${API_BASE_URL}/api/methodology`)
       .then((res) => res.json())
       .then((data) => setMethodologyData(data))
       .catch((err) => console.error('Error fetching methodology:', err));
@@ -197,7 +224,7 @@ export default function App() {
             <button
               id="nav-tab-dashboard"
               className={`tab-btn ${activeScreen === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActiveScreen('dashboard')}
+              onClick={() => navigateTo('dashboard')}
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem' }}
             >
               <LayoutDashboard size={16} />
@@ -206,7 +233,7 @@ export default function App() {
             <button
               id="nav-tab-methodology"
               className={`tab-btn ${activeScreen === 'methodology' ? 'active' : ''}`}
-              onClick={() => setActiveScreen('methodology')}
+              onClick={() => navigateTo('methodology')}
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem' }}
             >
               <BookOpen size={16} />
@@ -921,7 +948,76 @@ export default function App() {
               </div>
             </div>
 
-            {/* Sub-section 3: Dataset Limitation Notice */}
+            {/* Sub-section 3: Algorithmic Feature Methodologies */}
+            <div className="card mb-8">
+              <h3 className="card-title">
+                <FileText size={18} color="#a855f7" />
+                Algorithmic Scoring & Audit Formulas (Zero LLM Deterministic Modules)
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* DDI Card */}
+                <div style={{ background: 'rgba(30, 41, 59, 0.6)', padding: '1.25rem', borderRadius: '10px', border: '1px solid #334155' }}>
+                  <h4 style={{ color: '#c084fc', fontWeight: 700, fontSize: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShieldAlert size={16} /> 1. Disclosure Distortion Index (DDI)
+                  </h4>
+                  <div style={{ fontFamily: 'monospace', background: '#0f172a', padding: '0.5rem 0.75rem', borderRadius: '6px', color: '#38bdf8', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+                    DDI_i = MaterialityScore_i - EmphasisScore_i
+                  </div>
+                  <ul style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                    <li><strong>Materiality Score ($M_i \in [0, 100]$)</strong>: Quantifies stated numbers (percentages, ₹ amounts, ratio metrics) + magnitude bonuses.</li>
+                    <li><strong>Emphasis Score ($E_i \in [0, 100]$)</strong>: Weighted sum ($0.50 \times \text{Position} + 0.30 \times \text{Header} + 0.20 \times \text{Length}$).</li>
+                    <li><strong>Buried Risk Flag Threshold</strong>: Risks with <strong>$\text{DDI} &gt; +30.0$</strong> are flagged as <em>Buried Important Risks</em> (high financial materiality placed with low narrative emphasis).</li>
+                  </ul>
+                </div>
+
+                {/* Obfuscation Test Card */}
+                <div style={{ background: 'rgba(30, 41, 59, 0.6)', padding: '1.25rem', borderRadius: '10px', border: '1px solid #334155' }}>
+                  <h4 style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Scale size={16} /> 2. Obfuscation Hypothesis Test
+                  </h4>
+                  <div style={{ fontFamily: 'monospace', background: '#0f172a', padding: '0.5rem 0.75rem', borderRadius: '6px', color: '#a7f3d0', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+                    Spearman Rank Correlation (ρ) [Flesch Readability vs Severity (1-5)]
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                    <p style={{ marginBottom: '0.5rem' }}><strong>Per-Company Empirical Results</strong>:</p>
+                    <ul style={{ paddingLeft: '1rem', listStyleType: 'disc' }}>
+                      <li><strong>Zomato</strong>: $\rho = +0.2485, p = 0.0477$ (Statistically Significant) — severe risks use clearer prose.</li>
+                      <li><strong>Paytm</strong>: $\rho = +0.2016, p = 0.0711$ (Borderline / Not Significant at $p &lt; 0.05$).</li>
+                      <li><strong>Lohia Corp</strong>: $\rho = +0.0984, p = 0.3643$ (Not Statistically Significant).</li>
+                      <li><strong>Combined Dataset (232 risks)</strong>: $\rho = +0.1826, p = 0.0053$ (Statistically Significant) — <em>contradicts obfuscation hypothesis</em>.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Shadow Ledger Card */}
+                <div style={{ background: 'rgba(30, 41, 59, 0.6)', padding: '1.25rem', borderRadius: '10px', border: '1px solid #334155' }}>
+                  <h4 style={{ color: '#facc15', fontWeight: 700, fontSize: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckSquare size={16} /> 3. Shadow Ledger Engine
+                  </h4>
+                  <p style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.5', marginBottom: '0.5rem' }}>
+                    Cross-checks 3 core figures (<strong>Total Revenue, PAT/Loss, Total Debt/Borrowings</strong>) between Risk Factors text and primary Summary Financial Tables.
+                  </p>
+                  <div style={{ background: '#0f172a', padding: '0.5rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', color: '#fef08a' }}>
+                    <strong>Strict Equivalence Audit Rules</strong>: Figures are only compared if they match in Fiscal Year, Accounting Scope (Standalone vs Consolidated), and Defined Metric. Non-equivalent metrics (e.g. Sanctioned Limits vs Balance Sheet Carrying Debt) are explicitly labeled <em>"Not Directly Comparable"</em> rather than forced into a match/mismatch.<br />
+                    <em style={{ color: '#34d399' }}>Confirmed Exact Match Example: Lohia Corp corporate guarantee (₹413.00M on P.323 Note 36 matched Risk #9 claim, 0.0% diff).</em>
+                  </div>
+                </div>
+
+                {/* Use of Proceeds & Promoter Flag Card */}
+                <div style={{ background: 'rgba(30, 41, 59, 0.6)', padding: '1.25rem', borderRadius: '10px', border: '1px solid #334155' }}>
+                  <h4 style={{ color: '#34d399', fontWeight: 700, fontSize: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Info size={16} /> 4. Use of Proceeds & Promoter Structure
+                  </h4>
+                  <ul style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                    <li><strong>Use of Proceeds Breakdown</strong>: Extracted directly from <em>Objects of the Offer</em> fund allocation tables (organic/inorganic growth, capex, general corporate). Note: Lohia Corp is a 100% Offer for Sale (OFS) with ₹0 fresh issue proceeds.</li>
+                    <li><strong>Promoter Structure Flag</strong>: Extracted from explicit DRHP cover page & Capital Structure disclosures. Flags professionally managed companies without identifiable promoters (e.g. Paytm, Zomato) vs traditional promoter groups (e.g. Lohia Corp: Raj Kumar Lohia, Gaurav Lohia, Ritu Lohia).</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-section 4: Dataset Limitation Notice */}
             <div className="card">
               <h3 className="card-title">
                 <Info size={18} color="#facc15" />

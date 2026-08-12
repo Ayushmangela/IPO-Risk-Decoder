@@ -2,18 +2,6 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/companies/:path*",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/companies",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/methodology",
-      "destination": "/api/index.py"
-    },
-    {
       "source": "/api/:path*",
       "destination": "/api/index.py"
     }
