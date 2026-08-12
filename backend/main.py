@@ -7,16 +7,20 @@ Per GEMINI.md:
 - Exposes core endpoints for companies, risk factors, summary metrics, litigation load, disclosure distortion, and methodology.
 """
 
+import importlib
+import json
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
+PDF_DIR = DATA_DIR / "pdfs"
 SCORED_RISKS_DB = DATA_DIR / "scored_risks.db"
 COMPANIES_CSV = DATA_DIR / "companies.csv"
 PEER_STATS_CSV = DATA_DIR / "peer_stats.csv"
@@ -26,6 +30,10 @@ OBFUSCATION_REPORT_CSV = DATA_DIR / "obfuscation_report.csv"
 DDI_REPORT_CSV = DATA_DIR / "ddi_report.csv"
 OBFUSCATION_OUTLIERS_CSV = DATA_DIR / "obfuscation_outliers.csv"
 DDI_OUTLIERS_CSV = DATA_DIR / "ddi_outliers.csv"
+ACTIVE_IPOS_JSON = DATA_DIR / "active_ipos.json"
+
+# Needed to dynamically import the numbered scripts/ modules (e.g. "scripts.14_fetch_active_ipos")
+sys.path.insert(0, str(BASE_DIR))
 
 
 app = FastAPI(
@@ -507,6 +515,125 @@ def get_company_outliers(company_id: str):
             detail=f"Company with ID '{company_id}' not found. Available companies: {', '.join([c['company_id'] for c in get_companies_list()])}",
         )
     return fetch_outliers_for_company(company_id)
+
+
+# =====================================================================
+# ACTIVE IPO BROWSER + PDF UPLOAD PIPELINE (v2 — see GEMINI.md)
+#
+# Discovery-only browsing (GET /active-ipos) never triggers processing.
+# POST /upload-drhp is the only path that invokes the LLM live, and only
+# on an explicit, single user-initiated request. Local `uvicorn` only —
+# not supported on the Vercel deployment (read-only filesystem, no
+# configured timeout override for a 1-2 minute request).
+# =====================================================================
+
+@app.get("/active-ipos")
+@app.get("/api/active-ipos")
+def get_active_ipos():
+    """Returns the cached active/upcoming mainboard IPO list. Refreshed only
+    via POST /active-ipos/refresh — never automatically."""
+    if not ACTIVE_IPOS_JSON.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="No cached active IPO list yet. Call POST /active-ipos/refresh first.",
+        )
+    with open(ACTIVE_IPOS_JSON) as f:
+        return json.load(f)
+
+
+@app.post("/active-ipos/refresh")
+@app.post("/api/active-ipos/refresh")
+def refresh_active_ipos():
+    """Re-runs the chittorgarh.com scraper on demand and returns the refreshed list."""
+    try:
+        fetch_module = importlib.import_module("scripts.14_fetch_active_ipos")
+        result = fetch_module.fetch_active_ipos()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to refresh active IPO list: {exc}")
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(ACTIVE_IPOS_JSON, "w") as f:
+        json.dump(result, f, indent=2)
+    return result
+
+
+class UploadDrhpResponse(BaseModel):
+    company_id: str
+    company_name: str
+    status: str
+    steps_completed: List[str]
+
+
+@app.post("/upload-drhp", response_model=UploadDrhpResponse)
+@app.post("/api/upload-drhp", response_model=UploadDrhpResponse)
+async def upload_drhp(
+    file: UploadFile = File(...),
+    company_name: str = Form(...),
+    sector: str = Form("Uploaded"),
+):
+    """Uploads a DRHP PDF and runs the full analysis pipeline synchronously
+    (single-user showcase app — a blocking request with a frontend loading
+    state is the intended UX, per the feature spec). Runs locally via
+    uvicorn only.
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
+    if not company_name or not company_name.strip():
+        raise HTTPException(status_code=400, detail="company_name is required.")
+
+    pipeline = importlib.import_module("scripts.15_process_uploaded_drhp")
+
+    company_id = pipeline.slugify_company_id(company_name)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Could not derive a valid company_id from that company name.")
+
+    existing = find_company_by_id(company_id)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A company with ID '{company_id}' already exists ('{existing['name']}'). Choose a different name.",
+        )
+
+    PDF_DIR.mkdir(parents=True, exist_ok=True)
+    pdf_path = PDF_DIR / f"{company_id}.pdf"
+    contents = await file.read()
+    with open(pdf_path, "wb") as f:
+        f.write(contents)
+
+    # DRHP verification happens as pipeline step 1 -- but check it here first
+    # too so we can return a clean 400 (and remove the temp file) before
+    # committing to the full run, per the spec's "verify before processing" step.
+    is_drhp, matched = pipeline.verify_is_drhp(pdf_path)
+    if not is_drhp:
+        pdf_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=400,
+            detail="This doesn't appear to be a DRHP — no standard sections detected.",
+        )
+
+    log_lines = []
+
+    try:
+        steps_completed = pipeline.run_full_pipeline(
+            pdf_path, company_id, company_name.strip(), sector.strip() or "Uploaded", log=log_lines.append
+        )
+    except pipeline.PipelineStepError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"failed_step": exc.step, "message": exc.message, "log": log_lines},
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"failed_step": "unknown", "message": str(exc), "log": log_lines},
+        )
+
+    return {
+        "company_id": company_id,
+        "company_name": company_name.strip(),
+        "status": "complete",
+        "steps_completed": steps_completed,
+    }
 
 
 # Endpoint 6: GET /methodology
