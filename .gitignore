@@ -7,6 +7,9 @@ venv/
 env/
 *.sqlite3
 *.db
+# The pre-computed scored_risks.db IS meant to ship with the app (read-only
+# dataset served by the deployed backend) -- do not ignore it.
+!data/scored_risks.db
 
 # PDFs (stored locally)
 data/pdfs/*.pdf
