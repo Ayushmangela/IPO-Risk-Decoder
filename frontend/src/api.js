@@ -8,23 +8,6 @@ export const API_BASE_URL =
     ? 'http://127.0.0.1:8000'
     : '';
 
-export const CATEGORY_COLORS = {
-  Financial: '#3b82f6',
-  Legal: '#a855f7',
-  Regulatory: '#ec4899',
-  Operational: '#f59e0b',
-  Market: '#10b981',
-  Reputational: '#06b6d4',
-};
-
-export const SEVERITY_COLORS = {
-  5: '#ef4444', // Severe
-  4: '#f97316', // High
-  3: '#eab308', // Moderate
-  2: '#10b981', // Low
-  1: '#06b6d4', // Minimal
-};
-
 export const STATIC_METHODOLOGY_DATA = {
   rubric: {
     scale: [
