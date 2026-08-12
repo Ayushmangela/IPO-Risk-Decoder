@@ -125,8 +125,8 @@ export default function MethodologyPage({ data }) {
             </div>
             <ul style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.5' }}>
               <li><strong>Materiality Score ($M_i \in [0, 100]$)</strong>: Quantifies stated numbers (percentages, ₹ amounts, ratio metrics) + magnitude bonuses.</li>
-              <li><strong>Emphasis Score ($E_i \in [0, 100]$)</strong>: Weighted sum ($0.50 \times \text{Position} + 0.30 \times \text{Header} + 0.20 \times \text{Length}$).</li>
-              <li><strong>Buried Risk Flag Threshold</strong>: Risks with <strong>$\text{DDI} &gt; +30.0$</strong> are flagged as <em>Buried Important Risks</em> (high financial materiality placed with low narrative emphasis).</li>
+              <li><strong>Emphasis Score ($E_i \in [0, 100]$)</strong>: Weighted sum (0.50 × Position + 0.30 × Header + 0.20 × Length).</li>
+              <li><strong>Buried Risk Flag Threshold</strong>: Risks with <strong>DDI &gt; +30.0</strong> are flagged as <em>Buried Important Risks</em> (high financial materiality placed with low narrative emphasis).</li>
             </ul>
           </div>
 
