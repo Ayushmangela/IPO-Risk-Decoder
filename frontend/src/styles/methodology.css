@@ -10,6 +10,26 @@
   font-size: 13px;
 }
 
+@media (max-width: 860px) {
+  .methodology-table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .methodology-table thead,
+  .methodology-table tbody,
+  .methodology-table tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    min-width: 480px;
+  }
+
+  .methodology-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .methodology-table th {
   text-align: left;
   padding: 10px var(--space-4);
@@ -81,7 +101,7 @@
   display: flex;
   gap: var(--space-3);
   background: var(--warning-wash);
-  border: 1px solid rgba(199, 138, 61, 0.35);
+  border: 1px solid var(--warning-border);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
 }

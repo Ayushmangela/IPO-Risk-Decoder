@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowClockwise, ArrowSquareOut, UploadSimple, WarningCircle, Info } from '@phosphor-icons/react';
+import { ArrowClockwise, ArrowSquareOut, UploadSimple, WarningCircle, Info, Check } from '@phosphor-icons/react';
 import EmptyState from '../primitives/EmptyState';
 import { SkeletonRows } from '../primitives/Skeleton';
 import { fetchActiveIpos, refreshActiveIpos, uploadDrhp } from '../api';
 
-const PROGRESS_MESSAGES = [
-  'Verifying this is a DRHP…',
-  'Extracting risk factors from the PDF…',
-  'Scoring risk factors with Gemini — this may take 1-2 minutes…',
-  'Extracting litigation cases & industry overview…',
-  'Computing Disclosure Distortion Index & Obfuscation metrics…',
-  'Recomputing cross-company benchmarks…',
+/* Mirrors the real pipeline stages in scripts/15_process_uploaded_drhp.py.
+   `weight` is the rough share of total wall-clock each stage takes — LLM
+   scoring dominates, so an evenly-timed indicator would sit at "step 3 of 6"
+   looking stalled for most of the run. These drive dwell time only; they are
+   an honest estimate of duration, never a claim about backend state. */
+const PIPELINE_STAGES = [
+  { label: 'Verifying DRHP structure', weight: 1 },
+  { label: 'Extracting risk factors', weight: 2 },
+  { label: 'Scoring risk factors with Gemini', weight: 12 },
+  { label: 'Extracting litigation & industry', weight: 3 },
+  { label: 'Computing DDI & obfuscation metrics', weight: 1 },
+  { label: 'Recomputing cross-company benchmarks', weight: 1 },
 ];
 
 export default function AddCompanyPanel({ onCompanyAdded }) {
@@ -26,7 +31,7 @@ export default function AddCompanyPanel({ onCompanyAdded }) {
   const [sector, setSector] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
-  const [progressMessage, setProgressMessage] = useState('');
+  const [activeStage, setActiveStage] = useState(0);
   const [autoFetchNote, setAutoFetchNote] = useState(null);
 
   useEffect(() => {
@@ -72,17 +77,25 @@ export default function AddCompanyPanel({ onCompanyAdded }) {
     setTab('upload');
   }
 
+  /* The endpoint is a single synchronous call with no progress stream, so the
+     indicator advances on weighted timers rather than pretending to know the
+     backend's true position. It deliberately STOPS on the final stage instead
+     of looping — a wrapping indicator would imply the run restarted. The copy
+     below the indicator is explicit that these are estimates. */
   useEffect(() => {
     if (!uploading) {
+      setActiveStage(0);
       return undefined;
     }
-    let i = 0;
-    setProgressMessage(PROGRESS_MESSAGES[0]);
-    const id = setInterval(() => {
-      i = (i + 1) % PROGRESS_MESSAGES.length;
-      setProgressMessage(PROGRESS_MESSAGES[i]);
-    }, 7000);
-    return () => clearInterval(id);
+    const unit = 5000;
+    const timers = [];
+    let elapsed = 0;
+    PIPELINE_STAGES.forEach((stage, i) => {
+      if (i === 0) return;
+      elapsed += PIPELINE_STAGES[i - 1].weight * unit;
+      timers.push(setTimeout(() => setActiveStage(i), elapsed));
+    });
+    return () => timers.forEach(clearTimeout);
   }, [uploading]);
 
   async function handleUpload(e) {
@@ -140,7 +153,7 @@ export default function AddCompanyPanel({ onCompanyAdded }) {
           setSector={setSector}
           uploading={uploading}
           uploadError={uploadError}
-          progressMessage={progressMessage}
+          activeStage={activeStage}
           autoFetchNote={autoFetchNote}
           onSubmit={handleUpload}
         />
@@ -166,6 +179,7 @@ function BrowseTab({ ipos, loading, error, refreshing, onRefresh, onGetPdf }) {
         <SkeletonRows rows={6} rowHeight={52} />
       ) : error ? (
         <EmptyState
+          tone="error"
           icon={<WarningCircle size={32} />}
           title="Couldn't load the active IPO list"
           description={error}
@@ -218,18 +232,31 @@ function UploadTab({
   setSector,
   uploading,
   uploadError,
-  progressMessage,
+  activeStage,
   autoFetchNote,
   onSubmit,
 }) {
   if (uploading) {
     return (
       <div className="pipeline-progress">
-        <div className="pipeline-spinner" />
-        <div className="pipeline-progress-message">{progressMessage}</div>
+        <div className="pipeline-stage-list" role="status" aria-live="polite">
+          {PIPELINE_STAGES.map((stage, i) => {
+            const state = i < activeStage ? 'done' : i === activeStage ? 'active' : 'pending';
+            return (
+              <div className={`pipeline-stage pipeline-stage-${state}`} key={stage.label}>
+                <span className="pipeline-stage-marker" aria-hidden="true">
+                  {state === 'done' ? <Check size={12} weight="bold" /> : <span className="pipeline-stage-dot" />}
+                </span>
+                <span className="pipeline-stage-label">{stage.label}</span>
+                {state === 'active' && <span className="pipeline-stage-spinner" aria-hidden="true" />}
+              </div>
+            );
+          })}
+        </div>
         <div className="pipeline-progress-note">
-          Running the full analysis pipeline synchronously for "{companyName}" — this page will redirect to its
-          dashboard automatically when done.
+          Running the full pipeline for "{companyName}". Stage timings are estimates — the API returns once at
+          the end, so this indicator can't report the backend's exact position. You'll be redirected
+          automatically when it finishes.
         </div>
       </div>
     );

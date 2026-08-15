@@ -16,11 +16,7 @@ body {
   line-height: 1.5;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
-  overflow-x: auto;
-}
-
-#root {
-  min-width: 1200px;
+  overflow-x: hidden;
 }
 
 ::selection {

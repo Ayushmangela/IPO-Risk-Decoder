@@ -1,0 +1,564 @@
+<title>IPO Risk Decoder — UI/UX Audit &amp; Design DNA</title>
+
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0efec;
+    --border: #e2e0da;
+    --border-strong: #c9c6bd;
+    --text: #1c1b19;
+    --text-2: #55534c;
+    --text-3: #8a877d;
+    --accent: #3452e0;
+    --accent-wash: #e8ecfd;
+    --good: #1a7a4c;
+    --good-wash: #e5f5ec;
+    --warn: #966a12;
+    --warn-wash: #faf1e0;
+    --bad: #b0342c;
+    --bad-wash: #fbeae8;
+    --mono: ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0e10;
+      --surface: #141518;
+      --surface-2: #1a1c20;
+      --border: #2a2c31;
+      --border-strong: #3c3e44;
+      --text: #eceef0;
+      --text-2: #a8abb2;
+      --text-3: #6e7178;
+      --accent: #6c86ff;
+      --accent-wash: #1a2040;
+      --good: #4fbf85;
+      --good-wash: #12291d;
+      --warn: #e0ac4a;
+      --warn-wash: #2e2413;
+      --bad: #e2685f;
+      --bad-wash: #33191a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0d0e10;
+    --surface: #141518;
+    --surface-2: #1a1c20;
+    --border: #2a2c31;
+    --border-strong: #3c3e44;
+    --text: #eceef0;
+    --text-2: #a8abb2;
+    --text-3: #6e7178;
+    --accent: #6c86ff;
+    --accent-wash: #1a2040;
+    --good: #4fbf85;
+    --good-wash: #12291d;
+    --warn: #e0ac4a;
+    --warn-wash: #2e2413;
+    --bad: #e2685f;
+    --bad-wash: #33191a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 28px 120px;
+  }
+
+  .kicker {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+
+  .lede {
+    font-size: 16px;
+    color: var(--text-2);
+    max-width: 68ch;
+    margin: 0 0 40px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 56px 0 6px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h2 .num { color: var(--text-3); font-weight: 500; margin-right: 8px; }
+
+  h3 {
+    font-size: 14.5px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+    color: var(--text);
+  }
+
+  p { margin: 0 0 14px; color: var(--text-2); font-size: 14.5px; }
+
+  .section-note {
+    font-size: 13.5px;
+    color: var(--text-3);
+    margin: 8px 0 24px;
+  }
+
+  .verdict-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 20px 22px;
+    margin: 24px 0 40px;
+  }
+
+  .verdict-banner p:last-child { margin-bottom: 0; }
+
+  .finding {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+  }
+
+  .finding:last-child { border-bottom: none; }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    height: fit-content;
+  }
+
+  .tag-good { background: var(--good-wash); color: var(--good); }
+  .tag-gap { background: var(--bad-wash); color: var(--bad); }
+  .tag-partial { background: var(--warn-wash); color: var(--warn); }
+
+  .finding-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .finding-body {
+    font-size: 13.5px;
+    color: var(--text-2);
+    line-height: 1.55;
+  }
+
+  .finding-body code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 12px 0 8px;
+  }
+
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-2);
+    vertical-align: top;
+  }
+
+  td:first-child, th:first-child { padding-left: 0; }
+
+  td code {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .swatch-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+  .swatch { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+  .swatch-chip { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--border-strong); flex-shrink: 0; }
+
+  .plan-list { list-style: none; margin: 12px 0; padding: 0; }
+  .plan-item {
+    display: flex;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .plan-item:last-child { border-bottom: none; }
+  .plan-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    width: 20px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .plan-body { flex: 1; }
+  .plan-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .plan-desc { font-size: 13px; color: var(--text-2); }
+  .plan-effort {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    white-space: nowrap;
+    padding-top: 2px;
+  }
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    margin: 20px 0;
+  }
+
+  .callout-bad { border-left: 3px solid var(--bad); }
+  .callout-title { font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }
+
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-x: auto;
+    color: var(--text-2);
+  }
+
+  .gate {
+    background: var(--accent-wash);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 24px 26px;
+    margin-top: 48px;
+  }
+
+  .gate h2 { border: none; margin-top: 0; padding-bottom: 0; }
+  .gate p { color: var(--text); }
+
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 24px 0 8px;
+    padding: 0;
+  }
+  .toc a {
+    font-size: 12.5px;
+    color: var(--text-2);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+</style>
+
+<div class="wrap">
+  <p class="kicker">UI/UX Audit — Phase 1 (per request, no code changes in this pass)</p>
+  <h1>IPO Risk Decoder — Design DNA &amp; Audit Findings</h1>
+  <p class="lede">
+    Full inspection of the React/Vite frontend — framework, every component, primitives,
+    state handling, accessibility, motion, and responsive behavior — before any implementation.
+  </p>
+
+  <div class="toc">
+    <a href="#context">Context</a>
+    <a href="#dna">Design DNA</a>
+    <a href="#findings">Audit findings</a>
+    <a href="#threejs">Three.js recommendation</a>
+    <a href="#plan">Proposed plan</a>
+  </div>
+
+  <div class="verdict-banner">
+    <p><strong>Honest framing before the detail:</strong> this isn't a from-scratch "vibe-coded" app —
+    a deliberate design system already exists (<code>MASTER.md</code>, applied across every stylesheet
+    in an earlier session this conversation): near-black monochrome ground, one signal-blue accent,
+    IBM Plex Sans/Mono, 4px radius ceiling, no gradients, no glassmorphism, no glow. A mobile-responsive
+    pass also already landed. So a chunk of the "avoid generic AI dashboard" list is already satisfied.</p>
+    <p>What's genuinely missing, concretely: <strong>motion is almost entirely absent</strong> (a few
+    CSS hover transitions, nothing else — no entrance choreography, no number transitions, no modal
+    transitions), <strong>one real color-token bug</strong> survived the earlier migration, and
+    <strong>information hierarchy on Overview treats four numbers as equally important</strong> when
+    one of them (overall risk) should visually dominate. That's the real scope. Details below.</p>
+  </div>
+
+  <h2 id="context"><span class="num">0</span>Stack &amp; structure</h2>
+  <table>
+    <tr><th>Layer</th><th>What's actually there</th></tr>
+    <tr><td>Framework</td><td>React 18 + Vite 5. No React Router — <code>App.jsx</code> hand-rolls view switching via <code>pushState</code>/<code>popstate</code> against 6 flat views. Works correctly, no deep-linking gaps found.</td></tr>
+    <tr><td>Charts</td><td>Recharts (bar, donut). Already dark-tooltip-styled from the earlier session.</td></tr>
+    <tr><td>Icons</td><td>Phosphor React exclusively — one consistent set, not a mix. Not a gap.</td></tr>
+    <tr><td>Animation library</td><td>None installed. Every transition currently is a plain CSS <code>transition</code>.</td></tr>
+    <tr><td>Design tokens</td><td><code>tokens.css</code>, consumed by 9 more stylesheets + <code>constants.js</code> (JS-side color mirror for chart fills).</td></tr>
+    <tr><td>Reusable primitives</td><td><code>Surface</code>/<code>PanelHeading</code>, <code>StatTile</code>, <code>Badge</code>, <code>EmptyState</code>, <code>Skeleton</code>/<code>SkeletonRows</code>, <code>IconButton</code> — genuinely shared, genuinely used consistently across all 6 feature panels.</td></tr>
+    <tr><td>State/data</td><td>Plain <code>fetch</code> wrappers in <code>api.js</code>, lifted state in <code>App.jsx</code>, loading booleans per resource. No client cache/query library — fine at this scale, not a gap worth fixing.</td></tr>
+  </table>
+
+  <h2 id="dna"><span class="num">1</span>Design DNA — current state</h2>
+  <p class="section-note">Per the Design DNA schema's three dimensions, documenting what's actually implemented (not a reference image — this is a self-audit of the live codebase).</p>
+
+  <h3>design_system (measurable)</h3>
+  <table>
+    <tr><th>Field</th><th>Value</th></tr>
+    <tr><td><code>color.palette_type</code></td><td>Monochromatic ground + single accent + separate semantic/severity scale</td></tr>
+    <tr><td><code>color.accent</code></td><td><code>#4c6fff</code> — "signal blue," reserved for interactive/focus states only, never decorative</td></tr>
+    <tr><td><code>color.contrast_strategy</code></td><td>High contrast, dark-dominant (near-black ground, light text 15.8:1 / 7.1:1 ratios)</td></tr>
+    <tr><td><code>typography.font_families</code></td><td>IBM Plex Sans (UI/headings) + IBM Plex Mono (every number)</td></tr>
+    <tr><td><code>spacing.content_density</code></td><td>Deliberately mixed — generous between sections, tight within lists/tables</td></tr>
+    <tr><td><code>shape.border_radius</code></td><td>3px (chips) / 4px (cards, buttons) — hard ceiling, no <code>radius-lg</code> exists</td></tr>
+    <tr><td><code>elevation.shadow_style</code></td><td>None on static surfaces (hairline border instead) — one shadow token reserved for genuinely floating elements (command palette)</td></tr>
+    <tr><td><code>motion.duration_scale</code></td><td>140ms (hover/color) / 180ms (positional) — no macro scale defined yet, nothing choreographed</td></tr>
+    <tr><td><code>motion.philosophy</code></td><td>"Minimal functional" by design, but currently under-realized — tokens exist, almost nothing uses them beyond hover states</td></tr>
+    <tr><td><code>components.button_style</code></td><td>Flat, bordered secondary / filled primary. Consistent, actually used everywhere real actions exist.</td></tr>
+  </table>
+
+  <div class="swatch-row">
+    <span class="swatch"><span class="swatch-chip" style="background:#0a0b10"></span>ground</span>
+    <span class="swatch"><span class="swatch-chip" style="background:#4c6fff"></span>accent</span>
+    <span class="swatch"><span class="swatch-chip" style="background:#f2545b"></span>severity 5</span>
+    <span class="swatch"><span class="swatch-chip" style="background:#f2994a"></span>severity 4</span>
+    <span class="swatch"><span class="swatch-chip" style="background:#e0b430"></span>severity 3</span>
+    <span class="swatch"><span class="swatch-chip" style="background:#4caf7d"></span>severity 2</span>
+    <span class="swatch"><span class="swatch-chip" style="background:#5d7a9e"></span>severity 1</span>
+  </div>
+
+  <h3>design_style (qualitative)</h3>
+  <table>
+    <tr><td><code>aesthetic.mood</code></td><td>disciplined, precise, engineered, restrained, analytical</td></tr>
+    <tr><td><code>aesthetic.genre</code></td><td>Linear/Vercel-disciplined dashboard — closer to developer-tool seriousness than consumer fintech</td></tr>
+    <tr><td><code>visual_language.ornamentation</code></td><td>None — this is already correctly minimal, not a gap</td></tr>
+    <tr><td><code>visual_language.focal_strategy</code></td><td><strong>Currently "distributed interest" — this is the real Phase 3 gap.</strong> Should be "single hero element" on Overview (overall risk verdict).</td></tr>
+    <tr><td><code>interaction_feel.transition_personality</code></td><td>"Present but thin" — hover-only, no entrance/exit choreography</td></tr>
+    <tr><td><code>interaction_feel.loading_style</code></td><td>Shimmer skeletons, consistent, already good</td></tr>
+    <tr><td><code>brand_voice_in_ui.error_tone</code></td><td>Direct and specific (shows failed pipeline step + raw log) — appropriately serious for a financial tool, not a gap</td></tr>
+  </table>
+
+  <h3>visual_effects (special rendering)</h3>
+  <table>
+    <tr><td><code>overview.effect_intensity</code></td><td><strong>none</strong></td></tr>
+    <tr><td><code>overview.primary_technology</code></td><td>CSS only</td></tr>
+    <tr><td><code>glassmorphism_neumorphism.enabled</code></td><td>false — correctly absent per the brief's own anti-pattern list</td></tr>
+    <tr><td><code>3d_elements.enabled</code></td><td>false — see Three.js recommendation below</td></tr>
+    <tr><td><code>scroll_effects.*.enabled</code></td><td>false — appropriate for a data tool, not a marketing page</td></tr>
+  </table>
+
+  <h2 id="findings"><span class="num">2</span>Audit findings</h2>
+  <p class="section-note">Against the brief's own checklist. Marked <span class="tag tag-good">already good</span> where true — not padding the list, since claiming false gaps would waste implementation effort on non-problems.</p>
+
+  <div class="finding">
+    <span class="tag tag-gap">real bug</span>
+    <div>
+      <div class="finding-title">Badge tone colors: incomplete token migration</div>
+      <div class="finding-body"><code>primitives.css</code>'s <code>.badge-positive/.badge-warning/.badge-risk</code>
+      border colors are still the pre-redesign <code>rgba()</code> values (old muted teal-era tones), missed earlier
+      because that pass only grepped for <code>#hex</code> literals, not <code>rgba()</code>. Badge is the
+      most-reused component in the app (category tags, filing-status pills, party pills) — this is visible
+      inconsistency on nearly every screen.</div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <span class="tag tag-gap">real gap</span>
+    <div>
+      <div class="finding-title">Information hierarchy: no dominant element on Overview</div>
+      <div class="finding-body">"Total risks / Average severity / Buried risks / Litigation cases" render as
+      four equal-weight <code>StatTile</code>s. The brief is explicit: the user should see overall risk level
+      first and it should be visually dominant. Right now it's one of four same-size boxes — exactly the
+      "every card looks equally important" anti-pattern named in Phase 3.</div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <span class="tag tag-gap">real gap</span>
+    <div>
+      <div class="finding-title">Motion is functionally absent</div>
+      <div class="finding-body">Every transition in the codebase is a hover-state color/border change.
+      Zero: page/section entrance, number count-up on <code>StatTile</code> values, chart transitions,
+      command palette open/close (currently a hard <code>if (!open) return null</code> cut), success
+      feedback after a completed upload (silently redirects), or choreographed loading→content handoff.
+      This is where GSAP has a genuine, well-scoped job to do — not decoration, actual missing feedback.</div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <span class="tag tag-partial">partial</span>
+    <div>
+      <div class="finding-title">Upload pipeline progress feels mechanical</div>
+      <div class="finding-body">A single rotating text line + spinner over ~1-2 minutes of real backend work
+      (6 pipeline steps). A step-indicator (which stage is active/done) would read as more deliberate and
+      give the user actual position feedback, not just "something is happening."</div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <span class="tag tag-partial">partial</span>
+    <div>
+      <div class="finding-title">Empty vs. error states share one visual treatment</div>
+      <div class="finding-body"><code>EmptyState</code> is reused identically for "no data yet" and
+      "request failed" (e.g. active-IPO list). Differentiating icon/accent color (error → risk-tinted)
+      would help users distinguish "nothing here" from "something broke" at a glance.</div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <span class="tag tag-good">already good</span>
+    <div>
+      <div class="finding-title">Accessibility baseline</div>
+      <div class="finding-body">Global <code>:focus-visible</code> ring, <code>role="tablist"/"tab"/"listbox"/"option"</code>
+      used correctly, keyboard nav in the command palette (arrows/enter/escape) and risk rows (enter/space),
+      <code>aria-label</code>/<code>aria-expanded</code>/<code>aria-selected</code> throughout, color never used
+      alone (severity always pairs a dot + text label). This was not a weak starting point.</div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <span class="tag tag-good">already good</span>
+    <div>
+      <div class="finding-title">Responsive behavior, icons, gradients/glassmorphism/glow, radius consistency</div>
+      <div class="finding-body">Mobile bottom-tab-bar + grid collapse + contained table scroll landed last
+      turn (verified via actual scroll-capability testing at all 4 required breakpoints). Icons are Phosphor-only.
+      Zero gradients, zero glassmorphism, zero glow anywhere in the codebase — the brief's most-repeated
+      anti-pattern list is already clean.</div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <span class="tag tag-partial">worth doing</span>
+    <div>
+      <div class="finding-title">Chart polish: gridlines, legend, axis treatment</div>
+      <div class="finding-body">Functionally solid (dark tooltip, muted axis text, tabular nums already
+      applied). Room for a more "terminal" feel — faint gridlines, tighter legend integration — moderate
+      polish, not a structural fix.</div>
+    </div>
+  </div>
+
+  <h2 id="threejs"><span class="num">3</span>Three.js recommendation: don't</h2>
+  <div class="callout callout-bad">
+    <div class="callout-title">Not recommending Three.js for this product</div>
+    <p style="margin-bottom:0">There's no meaningful 3D opportunity here that a well-encoded 2D chart doesn't
+    already serve better. "Risk landscape" as a 3D scene would read as exactly the gimmick the brief warns
+    against — a serious analyst reading a DRHP risk register wants to scan a table fast, not orbit a scene.
+    The severity donut, category bar chart, and delta-bar peer comparison already give risk visual meaning
+    without asking the user to interact with a camera. This is the brief's own Phase 8 test applied honestly:
+    "only if it genuinely improves the product" — it doesn't here. Flagging this explicitly rather than
+    silently skipping it, since it was explicitly requested as a tool to consider.</p>
+  </div>
+
+  <h2 id="plan"><span class="num">4</span>Proposed implementation plan</h2>
+  <p class="section-note">Scoped to the real findings above, in priority order. Effort is rough, for sequencing — not a commitment.</p>
+  <ul class="plan-list">
+    <li class="plan-item">
+      <span class="plan-num">1</span>
+      <div class="plan-body">
+        <div class="plan-title">Fix the badge token bug</div>
+        <div class="plan-desc">Mechanical — sync 3 rgba() values to current tokens. Same fix pattern as the earlier token migration.</div>
+      </div>
+      <span class="plan-effort">~5 min</span>
+    </li>
+    <li class="plan-item">
+      <span class="plan-num">2</span>
+      <div class="plan-body">
+        <div class="plan-title">Give Overview a real hero: dominant risk verdict</div>
+        <div class="plan-desc">Reuse the severity-color language already built for the shareable card (docs/design). Large score + label, category chips demoted to supporting position, not equal-weight tiles.</div>
+      </div>
+      <span class="plan-effort">page-by-page, Overview first</span>
+    </li>
+    <li class="plan-item">
+      <span class="plan-num">3</span>
+      <div class="plan-body">
+        <div class="plan-title">Install GSAP, add purposeful motion</div>
+        <div class="plan-desc">Entrance stagger on Overview cards, number count-up on StatTile/hero score, command palette open/close transition, success feedback after upload completes. All gated behind <code>prefers-reduced-motion</code>, all ≤300ms, no bounce/elastic (matches the existing interaction thesis already in MASTER.md).</div>
+      </div>
+      <span class="plan-effort">the GSAP work</span>
+    </li>
+    <li class="plan-item">
+      <span class="plan-num">4</span>
+      <div class="plan-body">
+        <div class="plan-title">Upload pipeline: step indicator instead of rotating text</div>
+        <div class="plan-desc">6 known steps, backend already reports which one is running — surface it as real progress, not a marquee.</div>
+      </div>
+      <span class="plan-effort">small</span>
+    </li>
+    <li class="plan-item">
+      <span class="plan-num">5</span>
+      <div class="plan-body">
+        <div class="plan-title">Differentiate empty vs. error states</div>
+        <div class="plan-desc">Risk-tinted icon/accent for error variant of EmptyState, add an explicit <code>tone</code> prop.</div>
+      </div>
+      <span class="plan-effort">small</span>
+    </li>
+    <li class="plan-item">
+      <span class="plan-num">6</span>
+      <div class="plan-body">
+        <div class="plan-title">Chart polish pass</div>
+        <div class="plan-desc">Faint gridlines, legend treatment, axis refinement across CategoryBarChart/SeverityDonut/DeltaBar.</div>
+      </div>
+      <span class="plan-effort">moderate</span>
+    </li>
+  </ul>
+
+  <div class="gate">
+    <h2>Before I start coding</h2>
+    <p>This is still a meaningful amount of work across multiple files and a new dependency (GSAP).
+    Given the genjutsu pipeline's own rule — work page by page, validate page by page — I'd rather
+    confirm scope now than build all six items in one uninterrupted sweep and ask forgiveness later.</p>
+    <p style="margin-bottom:0"><strong>Does this plan match what you want, or should anything be
+    reprioritized, cut, or expanded before I touch code?</strong></p>
+  </div>
+</div>

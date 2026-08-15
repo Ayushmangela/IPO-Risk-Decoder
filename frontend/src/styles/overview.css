@@ -3,9 +3,133 @@
   gap: var(--space-6);
 }
 
+/* ── Risk verdict hero ─────────────────────────────────────────────
+   The one dominant element on the page. Everything below it is
+   supporting detail, so it gets the largest type in the app and the
+   only full-bleed two-column split. Deliberately NOT a .surface card:
+   giving it the same treatment as the panels beneath it is exactly
+   what made the old four-equal-tiles layout read as flat. */
+.risk-verdict {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: var(--space-10);
+  align-items: center;
+  padding: var(--space-8) 0 var(--space-10);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.verdict-eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-3);
+}
+
+.verdict-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.verdict-score {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 76px;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.verdict-denominator {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.verdict-label {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: var(--space-3);
+}
+
+.verdict-basis {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: var(--space-2);
+  max-width: 46ch;
+}
+
+.verdict-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.verdict-company-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.verdict-company-sector {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.verdict-spread-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-3);
+}
+
+/* Proportional stacked bar — severity encoded as width, so the shape of
+   the filing's risk profile reads before any number does. */
+.verdict-spread {
+  display: flex;
+  height: 10px;
+  border-radius: 2px;
+  overflow: hidden;
+  gap: 2px;
+}
+
+.verdict-spread-seg {
+  height: 100%;
+  border-radius: 1px;
+}
+
+.verdict-spread-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 860px) {
+  .risk-verdict {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+    padding: var(--space-4) 0 var(--space-6);
+  }
+
+  .verdict-score {
+    font-size: 58px;
+  }
+}
+
 .metric-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-4);
 }
 
@@ -93,12 +217,14 @@
   flex-direction: column;
   gap: var(--space-3);
   cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
-.highlight-card:hover {
-  border-color: var(--border-emphasis);
-  background: var(--bg-interactive-hover);
+@media (hover: hover) and (pointer: fine) {
+  .highlight-card:hover {
+    border-color: var(--border-emphasis);
+    background: var(--bg-interactive-hover);
+  }
 }
 
 .highlight-card:focus-visible {
@@ -171,4 +297,25 @@
   border: 1px solid var(--accent-border);
   padding: 6px 12px;
   border-radius: var(--radius-sm);
+}
+
+/* Below tablet: every multi-column grid on this page collapses to a single
+   column. Density that works at 1200px+ (four stat cards in a row, two
+   charts side by side) just becomes illegibly cramped at phone width —
+   stacking is the correct reading order here, not a compromise. */
+@media (max-width: 860px) {
+  .metric-row,
+  .industry-callout,
+  .highlight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-split,
+  .chart-row {
+    grid-template-columns: 1fr;
+  }
+
+  .obfuscation-banner {
+    flex-wrap: wrap;
+  }
 }

@@ -67,19 +67,19 @@
 
 .badge-positive {
   color: var(--positive);
-  border-color: rgba(95, 167, 119, 0.35);
+  border-color: var(--positive-border);
   background: var(--positive-wash);
 }
 
 .badge-warning {
   color: var(--warning);
-  border-color: rgba(199, 138, 61, 0.35);
+  border-color: var(--warning-border);
   background: var(--warning-wash);
 }
 
 .badge-risk {
   color: var(--risk);
-  border-color: rgba(196, 85, 74, 0.35);
+  border-color: var(--risk-border);
   background: var(--risk-wash);
 }
 
@@ -159,6 +159,18 @@
   opacity: 0.6;
 }
 
+/* Error variant — tinted icon + title so a failed request never reads as
+   "no data". Colour is not the only signal: the icon and copy differ too,
+   and role="alert" announces it. */
+.empty-state-error .empty-state-icon {
+  color: var(--risk);
+  opacity: 1;
+}
+
+.empty-state-error .empty-state-title {
+  color: var(--risk);
+}
+
 .empty-state-title {
   font-size: 14px;
   font-weight: 600;
@@ -183,12 +195,14 @@
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
 
-.icon-btn:hover {
-  background: var(--bg-interactive-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .icon-btn:hover {
+    background: var(--bg-interactive-hover);
+    color: var(--text-primary);
+  }
 }
 
 .icon-btn.active {
@@ -210,12 +224,14 @@
   background: var(--bg-focused);
   color: var(--text-primary);
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, transform 80ms ease;
+  transition: background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
-.btn:hover {
-  background: var(--bg-interactive-hover);
-  border-color: var(--border-emphasis);
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    background: var(--bg-interactive-hover);
+    border-color: var(--border-emphasis);
+  }
 }
 
 .btn:active {
@@ -229,9 +245,11 @@
   font-weight: 600;
 }
 
-.btn-primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
 }
 
 /* Divider */

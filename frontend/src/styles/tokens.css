@@ -1,47 +1,53 @@
 :root {
-  /* Surface hierarchy — cool graphite, five tonal layers */
-  --bg-app: #0b0d10;
-  --bg-workspace: #101216;
-  --bg-section: #15181c;
-  --bg-focused: #1c2025;
-  --bg-interactive-hover: #242930;
+  /* Surface hierarchy — near-black monochrome ground. See MASTER.md. */
+  --bg-app: #0a0b10;
+  --bg-workspace: #0a0b10;
+  --bg-section: #12141b;
+  --bg-focused: #1d2029;
+  --bg-interactive-hover: #181b24;
 
   /* Borders */
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-emphasis: rgba(255, 255, 255, 0.16);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-emphasis: rgba(255, 255, 255, 0.18);
 
   /* Text */
-  --text-primary: #edeef0;
-  --text-secondary: #9ba1ab;
-  --text-muted: #6c7178;
-  --text-on-accent: #08211f;
+  --text-primary: #edeef2;
+  --text-secondary: #9ba0ac;
+  --text-muted: #5f6570;
+  --text-on-accent: #08111f;
 
-  /* Accent — single purposeful accent, desaturated ink-teal */
-  --accent: #4fa69d;
-  --accent-hover: #3d8b85;
-  --accent-wash: rgba(79, 166, 157, 0.14);
-  --accent-border: rgba(79, 166, 157, 0.35);
+  /* Accent — single sharp signal-blue, reserved for interactive/focus only */
+  --accent: #4c6fff;
+  --accent-hover: #6684ff;
+  --accent-wash: rgba(76, 111, 255, 0.14);
+  --accent-border: rgba(76, 111, 255, 0.4);
 
-  /* Semantic status */
-  --positive: #5fa777;
-  --positive-wash: rgba(95, 167, 119, 0.14);
-  --warning: #c78a3d;
-  --warning-wash: rgba(199, 138, 61, 0.14);
-  --risk: #c4554a;
-  --risk-wash: rgba(196, 85, 74, 0.14);
+  /* Semantic status — distinct from severity scale, never cross-used.
+     Each tone carries wash (fill) + border so callers never hand-write an
+     rgba() literal; that's what let the old palette survive the last
+     migration in four separate files. */
+  --positive: #4caf7d;
+  --positive-wash: rgba(76, 175, 125, 0.14);
+  --positive-border: rgba(76, 175, 125, 0.35);
+  --warning: #e0b430;
+  --warning-wash: rgba(224, 180, 48, 0.14);
+  --warning-border: rgba(224, 180, 48, 0.35);
+  --risk: #f2545b;
+  --risk-wash: rgba(242, 84, 91, 0.14);
+  --risk-border: rgba(242, 84, 91, 0.35);
 
-  /* Severity scale (5 -> 1), desaturated, warm-to-cool */
-  --severity-5: #c4554a;
-  --severity-4: #c78a3d;
-  --severity-3: #a98f4a;
-  --severity-2: #6e9c7d;
-  --severity-1: #6b8cae;
+  /* Severity scale (5 -> 1) */
+  --severity-5: #f2545b;
+  --severity-4: #f2994a;
+  --severity-3: #e0b430;
+  --severity-2: #4caf7d;
+  --severity-1: #5d7a9e;
 
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  /* Radius — sharp-edged ceiling, no radius-lg on purpose */
+  --radius-sm: 3px;
+  --radius-md: 4px;
 
-  /* Spacing scale (4px base) */
+  /* Spacing scale (4px base) — unchanged, still correct for this thesis */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -61,6 +67,23 @@
   --topbar-height: 56px;
   --rail-width: 64px;
 
-  /* Shadow — reserved for genuinely floating elements only */
+  /* Overlay scrim behind floating surfaces (command palette) */
+  --overlay-scrim: rgba(4, 5, 6, 0.6);
+
+  /* Shadow — reserved for genuinely floating elements only (command palette,
+     dropdowns, toasts). Static cards use --border-subtle instead. */
   --shadow-float: 0 16px 40px -12px rgba(0, 0, 0, 0.55), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+
+  /* Motion — fast, dry, engineered. No bounce/elastic/spring anywhere. */
+  --duration-fast: 140ms;
+  --duration-move: 180ms;
+  --ease-out: ease-out;
+  --ease-move: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-move: 0ms;
+  }
 }

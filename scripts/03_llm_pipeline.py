@@ -118,8 +118,15 @@ def _call_local_llm(prompt: str, system_prompt: str) -> str:
     return data.get("response", "")
 
 
+# 429 = rate limit / quota; 503 = transient "model overloaded" -- observed
+# repeatedly in practice on the free tier hitting the same item shortly after
+# a prior call (2026-08-12), not just under genuine sustained load. Both are
+# worth retrying with backoff rather than failing the whole run immediately.
+RETRYABLE_STATUS_CODES = {429, 503}
+
+
 def _call_gemini_llm(prompt: str, system_prompt: str) -> str:
-    """Invokes Google Gemini API free tier endpoint with exponential backoff on 429 rate limits."""
+    """Invokes Google Gemini API free tier endpoint with exponential backoff on 429/503."""
     api_key = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", GEMINI_API_KEY))
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set.")
@@ -138,14 +145,14 @@ def _call_gemini_llm(prompt: str, system_prompt: str) -> str:
     for attempt in range(1, max_retries + 1):
         try:
             response = requests.post(url, json=payload, timeout=45)
-            if response.status_code == 429:
+            if response.status_code in RETRYABLE_STATUS_CODES:
                 if attempt < max_retries:
                     wait_time = 10 * attempt  # 10s, 20s, 30s backoff
-                    print(f"⚠️ Gemini API hit 429 Rate Limit. Retrying attempt {attempt}/{max_retries} in {wait_time}s...")
+                    print(f"⚠️ Gemini API returned HTTP {response.status_code}. Retrying attempt {attempt}/{max_retries} in {wait_time}s...")
                     time.sleep(wait_time)
                     continue
                 else:
-                    raise RuntimeError("Gemini API Rate Limit / Daily Quota Exceeded (HTTP 429). Execution halted to prevent writing placeholder data.")
+                    raise RuntimeError(f"Gemini API HTTP {response.status_code} persisted after {max_retries} attempts. Execution halted to prevent writing placeholder data.")
             response.raise_for_status()
             data = response.json()
             candidates = data.get("candidates", [])
@@ -155,13 +162,13 @@ def _call_gemini_llm(prompt: str, system_prompt: str) -> str:
                     return parts[0].get("text", "")
             raise ValueError("No text content returned from Gemini API response.")
         except requests.exceptions.HTTPError as http_err:
-            if response.status_code == 429:
+            if response.status_code in RETRYABLE_STATUS_CODES:
                 if attempt < max_retries:
                     wait_time = 10 * attempt
-                    print(f"⚠️ Gemini API 429 Quota Exceeded. Retrying attempt {attempt}/{max_retries} in {wait_time}s...")
+                    print(f"⚠️ Gemini API HTTP {response.status_code}. Retrying attempt {attempt}/{max_retries} in {wait_time}s...")
                     time.sleep(wait_time)
                     continue
-                raise RuntimeError(f"Gemini API Quota Exceeded (HTTP 429). Run halted: {http_err}") from http_err
+                raise RuntimeError(f"Gemini API HTTP {response.status_code} persisted after {max_retries} attempts: {http_err}") from http_err
             raise http_err
 
 

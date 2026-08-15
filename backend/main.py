@@ -13,10 +13,13 @@ import sqlite3
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, Response
 import pandas as pd
 from pydantic import BaseModel
+
+from backend.card_generator import generate_risk_card
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -515,6 +518,79 @@ def get_company_outliers(company_id: str):
             detail=f"Company with ID '{company_id}' not found. Available companies: {', '.join([c['company_id'] for c in get_companies_list()])}",
         )
     return fetch_outliers_for_company(company_id)
+
+
+# =====================================================================
+# SHAREABLE RISK CARD (v3)
+#
+# Pure presentation over the same data get_company_summary() already
+# computes -- no new DB queries, no LLM calls. GET .../card returns the raw
+# PNG; GET .../share returns a tiny HTML page whose og:image points at that
+# PNG so pasting the /share link into X/Reddit/Slack unfurls the card (a
+# bare image URL doesn't reliably unfurl on its own).
+# =====================================================================
+
+@app.get("/companies/{company_id}/card")
+@app.get("/api/companies/{company_id}/card")
+def get_company_risk_card(company_id: str):
+    """Renders a 1200x630 PNG risk card (name, severity verdict, top risk
+    categories) for sharing on social platforms."""
+    company = find_company_by_id(company_id)
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with ID '{company_id}' not found. Available companies: {', '.join([c['company_id'] for c in get_companies_list()])}",
+        )
+    summary = get_company_summary(company_id)
+    png_bytes = generate_risk_card(summary)
+    return Response(content=png_bytes, media_type="image/png")
+
+
+@app.get("/companies/{company_id}/share", response_class=HTMLResponse)
+@app.get("/api/companies/{company_id}/share", response_class=HTMLResponse)
+def get_company_share_page(company_id: str, request: Request):
+    """Minimal HTML page carrying og:image/twitter:image meta tags pointing
+    at the PNG card, so a pasted link unfurls with the card image. Redirects
+    a human visitor to the real dashboard after a moment.
+
+    og:image/twitter:image MUST be absolute URLs per the Open Graph spec --
+    X, Slack, and LinkedIn will not resolve a relative path when unfurling a
+    link, so they're built from the actual incoming request host rather than
+    hardcoded, keeping this correct in both local dev and on Vercel."""
+    company = find_company_by_id(company_id)
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with ID '{company_id}' not found. Available companies: {', '.join([c['company_id'] for c in get_companies_list()])}",
+        )
+    summary = get_company_summary(company_id)
+    base = str(request.base_url).rstrip("/")
+    card_url = f"{base}/api/companies/{company_id}/card"
+    dashboard_url = f"{base}/?company={company_id}"
+    title = f"{company['name']} — {summary['average_severity']:.1f}/5 Risk Profile"
+    description = f"{summary['total_risks']} disclosed risk factors, scored against a validated 1-5 severity rubric and benchmarked vs. sector peers."
+    html = f"""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{title}</title>
+<meta name="description" content="{description}">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{description}">
+<meta property="og:image" content="{card_url}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{title}">
+<meta name="twitter:description" content="{description}">
+<meta name="twitter:image" content="{card_url}">
+<meta http-equiv="refresh" content="0; url={dashboard_url}">
+</head>
+<body>
+<p>Redirecting to <a href="{dashboard_url}">{company['name']}'s risk dashboard</a>...</p>
+<img src="{card_url}" alt="{title}" style="max-width:100%">
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 # =====================================================================

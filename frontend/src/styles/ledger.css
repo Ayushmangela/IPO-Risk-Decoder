@@ -21,12 +21,14 @@
   padding: 6px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+  transition: border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
-.filter-chip:hover {
-  border-color: var(--border-emphasis);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .filter-chip:hover {
+    border-color: var(--border-emphasis);
+    color: var(--text-primary);
+  }
 }
 
 .filter-chip.active {
@@ -45,7 +47,7 @@
   padding: 7px 12px;
   width: 300px;
   color: var(--text-muted);
-  transition: border-color 120ms ease;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
 .search-field:focus-within {
@@ -95,7 +97,7 @@
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition: background-color var(--duration-fast) var(--ease-out);
   background: var(--bg-section);
 }
 
@@ -103,8 +105,10 @@
   border-bottom: none;
 }
 
-.ledger-row:hover {
-  background: var(--bg-focused);
+@media (hover: hover) and (pointer: fine) {
+  .ledger-row:hover {
+    background: var(--bg-focused);
+  }
 }
 
 .ledger-row:focus-visible {
@@ -158,7 +162,7 @@
 
 .ledger-chevron {
   color: var(--text-muted);
-  transition: transform 150ms ease;
+  transition: transform var(--duration-fast) var(--ease-out);
   justify-self: end;
 }
 
@@ -250,7 +254,7 @@
   align-items: center;
   gap: var(--space-3);
   background: var(--risk-wash);
-  border: 1px solid rgba(196, 85, 74, 0.35);
+  border: 1px solid var(--risk-border);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
   margin-bottom: var(--space-5);
@@ -278,4 +282,68 @@
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
   margin-bottom: var(--space-6);
+}
+
+/* Below tablet: the fixed-column table row (id / text / category / severity
+   / chevron) has no room to stay a single line at phone width, and a
+   horizontal-scroll table would hide the risk text — the one thing this
+   list exists to show. Restack into a card: id+chevron share a line, text
+   gets full width and three lines instead of two, badges/severity sit
+   below. .risk-ledger-row and .lit-ledger-row share the same cell classes
+   (ledger-cell-id/text/badges, ledger-chevron), so one ruleset covers both;
+   .severity-chip is risk-only and simply has no litigation counterpart. */
+@media (max-width: 860px) {
+  .ledger-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-field {
+    width: 100%;
+  }
+
+  .ledger-head {
+    display: none;
+  }
+
+  .risk-ledger-row,
+  .lit-ledger-row {
+    grid-template-columns: 1fr 24px;
+    grid-template-areas:
+      'id chevron'
+      'text text'
+      'badges badges'
+      'severity severity';
+    row-gap: var(--space-2);
+  }
+
+  .ledger-cell-id {
+    grid-area: id;
+  }
+
+  .ledger-chevron {
+    grid-area: chevron;
+  }
+
+  .ledger-cell-text {
+    grid-area: text;
+    padding-right: 0;
+    -webkit-line-clamp: 3;
+  }
+
+  .ledger-cell-badges {
+    grid-area: badges;
+  }
+
+  .severity-chip {
+    grid-area: severity;
+  }
+
+  .ledger-detail-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .litigation-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

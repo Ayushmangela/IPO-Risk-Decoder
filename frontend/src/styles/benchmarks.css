@@ -3,7 +3,7 @@
   align-items: flex-start;
   gap: var(--space-3);
   background: var(--warning-wash);
-  border: 1px solid rgba(199, 138, 61, 0.35);
+  border: 1px solid var(--warning-border);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
   margin-bottom: var(--space-6);
@@ -32,6 +32,21 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   overflow: hidden;
+}
+
+/* Below tablet: this is a genuine comparison table — the delta bars need
+   real horizontal room to be readable as a comparison, so restacking into
+   cards would lose the thing the table exists to show. It scrolls inside
+   its own frame instead (never the page body — see body { overflow-x:
+   hidden } in base.css). */
+@media (max-width: 860px) {
+  .benchmark-table {
+    overflow-x: auto;
+  }
+
+  .benchmark-row {
+    min-width: 620px;
+  }
 }
 
 .benchmark-row {
@@ -73,7 +88,7 @@
   position: relative;
   height: 8px;
   background: var(--bg-focused);
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   flex: 1;
 }
@@ -93,7 +108,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 .delta-bar-row {

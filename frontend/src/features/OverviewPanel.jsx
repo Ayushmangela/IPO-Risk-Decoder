@@ -3,16 +3,29 @@ import { Buildings, ChartLineUp, ArrowUpRight } from '@phosphor-icons/react';
 import Surface, { PanelHeading } from '../primitives/Surface';
 import StatTile from '../primitives/StatTile';
 import Skeleton from '../primitives/Skeleton';
-import { extractFigures, formatSeverity } from '../utils';
+import { extractFigures } from '../utils';
 import SeverityDonut from '../composed/SeverityDonut';
 import CategoryBarChart from '../composed/CategoryBarChart';
+import RiskVerdict from '../composed/RiskVerdict';
+import { useStaggerEntrance } from '../motion';
 
 export default function OverviewPanel({ selectedCompany, summaryData, outliersData, risks, loading, onJumpToRisk }) {
+  // Must run before the loading early-return — hooks can't be called
+  // conditionally. Keyed on company so switching filings replays the
+  // entrance rather than silently swapping numbers in place.
+  const gridRef = useStaggerEntrance(
+    loading || !summaryData ? null : selectedCompany?.company_id
+  );
+
   if (loading || !summaryData) {
     return (
       <div className="overview-grid">
+        {/* Skeleton mirrors the real layout's hierarchy — hero block first,
+            then the supporting tiles — so the handoff to loaded content
+            doesn't reflow the page. */}
+        <Skeleton height={168} radius="var(--radius-md)" />
         <div className="metric-row">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} height={92} radius="var(--radius-md)" />
           ))}
         </div>
@@ -28,13 +41,20 @@ export default function OverviewPanel({ selectedCompany, summaryData, outliersDa
   const buried = (outliersData?.ddi_outliers || []).slice(0, 3);
 
   return (
-    <div className="overview-grid">
+    <div className="overview-grid" ref={gridRef}>
+      <RiskVerdict
+        companyName={selectedCompany?.name}
+        sector={selectedCompany?.sector}
+        averageSeverity={summaryData.average_severity}
+        totalRisks={summaryData.total_risks}
+        risks={risks}
+        buriedCount={ddi?.buried_risk_count}
+      />
+
+      {/* Average severity intentionally absent — it's the hero above. Repeating
+          it here as a peer tile is what flattened the old hierarchy. */}
       <div className="metric-row">
         <StatTile label="Total risks identified" value={summaryData.total_risks} />
-        <StatTile
-          label="Average severity"
-          value={`${formatSeverity(summaryData.average_severity)} / 5`}
-        />
         <StatTile
           label="Buried risks flagged"
           value={ddi?.buried_risk_count ?? '—'}

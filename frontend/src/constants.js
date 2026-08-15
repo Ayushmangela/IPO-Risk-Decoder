@@ -28,21 +28,38 @@ export function normalizePartyType(value) {
   return (value || '').trim().toLowerCase();
 }
 
+/* Recharts renders SVG <text>, which doesn't inherit the CSS font stack —
+   numeric axes must be told to use the mono face explicitly or they fall
+   back to the default sans and stop aligning with every other figure. */
+export const CHART_FONT_MONO = "'IBM Plex Mono', 'SF Mono', Menlo, monospace";
+
 /* Chart libraries need literal color values (SVG fill/stroke), mirrored from tokens.css */
 export const CHART_COLORS = {
-  accent: '#4fa69d',
-  positive: '#5fa777',
-  warning: '#c78a3d',
-  risk: '#c4554a',
-  textMuted: '#6c7178',
-  textSecondary: '#9ba1ab',
-  gridLine: 'rgba(255,255,255,0.07)',
+  accent: '#4c6fff',
+  positive: '#4caf7d',
+  warning: '#e0b430',
+  risk: '#f2545b',
+  textMuted: '#5f6570',
+  textSecondary: '#9ba0ac',
+  gridLine: 'rgba(255,255,255,0.08)',
 };
 
 export const SEVERITY_COLOR_HEX = {
-  5: '#c4554a',
-  4: '#c78a3d',
-  3: '#a98f4a',
-  2: '#6e9c7d',
-  1: '#6b8cae',
+  5: '#f2545b',
+  4: '#f2994a',
+  3: '#e0b430',
+  2: '#4caf7d',
+  1: '#5d7a9e',
+};
+
+/* Recharts' Tooltip takes an inline style object, not a className, so its
+   surface can't come from CSS. Defined once here (rather than duplicated in
+   every chart) so all tooltips stay identical — mirrors --bg-focused /
+   --border-emphasis / --text-primary / --radius-md. */
+export const CHART_TOOLTIP_STYLE = {
+  background: '#1d2029',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 4,
+  fontSize: 12,
+  color: '#edeef2',
 };

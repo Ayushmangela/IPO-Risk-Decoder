@@ -6,7 +6,22 @@
     'rail topbar'
     'rail main';
   min-height: 100vh;
-  min-width: 1200px;
+}
+
+/* Below tablet: the sidebar rail becomes a fixed bottom tab bar (Hoober thumb
+   zones — primary nav belongs in the easy-reach bottom third on a phone, not
+   a cramped vertical strip). Single-column grid, rail row pinned to the
+   viewport bottom rather than occupying grid flow, so it floats over content
+   with its own safe-area padding. */
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--topbar-height) 1fr;
+    grid-template-areas:
+      'topbar'
+      'main';
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
 }
 
 /* Top bar */
@@ -15,12 +30,34 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
   background: var(--bg-workspace);
   border-bottom: 1px solid var(--border-subtle);
   padding: 0 var(--space-6);
   position: sticky;
   top: 0;
   z-index: 30;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .topbar {
+    padding: 0 var(--space-4);
+    padding-top: env(safe-area-inset-top);
+    height: calc(var(--topbar-height) + env(safe-area-inset-top));
+  }
+
+  .topbar-company-sector {
+    display: none;
+  }
+
+  /* Cmd+K has no touchscreen equivalent — the trigger is dead weight here,
+     not a feature to shrink down. Search still reachable via the Risk
+     register page's own search field. */
+  .cmdk-trigger {
+    display: none;
+  }
 }
 
 .topbar-left {
@@ -74,14 +111,16 @@
   font-size: 12.5px;
   font-weight: 500;
   padding: 6px 12px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
   white-space: nowrap;
 }
 
-.company-switch-item:hover {
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .company-switch-item:hover {
+    color: var(--text-primary);
+  }
 }
 
 .company-switch-item.active {
@@ -101,12 +140,14 @@
   color: var(--text-muted);
   font-size: 12.5px;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease;
+  transition: border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
 
-.cmdk-trigger:hover {
-  border-color: var(--border-emphasis);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .cmdk-trigger:hover {
+    border-color: var(--border-emphasis);
+    color: var(--text-secondary);
+  }
 }
 
 .cmdk-kbd {
@@ -115,7 +156,7 @@
   color: var(--text-muted);
   background: var(--bg-app);
   border: 1px solid var(--border-subtle);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 1px 5px;
 }
 
@@ -132,6 +173,46 @@
   position: sticky;
   top: 0;
   height: 100vh;
+}
+
+/* Below tablet: bottom tab bar, not a sidebar — thumb zone, not a strip
+   squeezed against the viewport edge. Fixed (not grid-flowed) so it floats
+   over .main-outlet, whose bottom padding (see .app-shell) reserves room
+   for it. */
+@media (max-width: 860px) {
+  .rail {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    top: auto;
+    height: auto;
+    /* vw, not right:0 — right:0 computes against the containing block, which
+       some engines miscalculate against document scrollWidth when ANY
+       descendant briefly overflows (e.g. a horizontally-scrollable table),
+       bleeding a few px past the true viewport. vw is viewport-relative
+       regardless. */
+    width: 100vw;
+    max-width: 100%;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: stretch;
+    padding: var(--space-1) var(--space-2);
+    padding-bottom: calc(var(--space-1) + env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 1px solid var(--border-subtle);
+    z-index: 30;
+  }
+
+  .rail-mark {
+    display: none;
+  }
+
+  .rail-nav {
+    flex-direction: row;
+    flex: 1;
+    justify-content: space-around;
+    gap: 0;
+  }
 }
 
 .rail-mark {
@@ -167,13 +248,15 @@
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
   position: relative;
 }
 
-.rail-item:hover {
-  background: var(--bg-interactive-hover);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .rail-item:hover {
+    background: var(--bg-interactive-hover);
+    color: var(--text-secondary);
+  }
 }
 
 .rail-item.active {
@@ -195,6 +278,18 @@
   max-width: 1800px;
   width: 100%;
   margin: 0 auto;
+  /* Grid items default to min-width: auto, which lets a wide descendant
+     (e.g. a table with min-width for its own contained horizontal scroll)
+     force this whole track wider than the viewport instead of clipping.
+     min-width: 0 is what actually lets descendants scroll internally
+     rather than blowing out the page. */
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .main-outlet {
+    padding: var(--space-4);
+  }
 }
 
 .view-header {

@@ -1,0 +1,636 @@
+<title>IPO Risk Decoder — Design Thesis</title>
+
+<style>
+  :root {
+    --bg: #0a0b10;
+    --surface: #12141b;
+    --surface-raised: #181b24;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.18);
+    --text-primary: #edeef2;
+    --text-secondary: #9ba0ac;
+    --text-muted: #5f6570;
+    --accent: #4c6fff;
+    --accent-dim: rgba(76,111,255,0.14);
+    --sev-5: #f2545b;
+    --sev-4: #f2994a;
+    --sev-3: #e0b430;
+    --sev-2: #4caf7d;
+    --sev-1: #5d7a9e;
+    --radius: 4px;
+    --font-display: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 64px 32px 120px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+
+  h1 {
+    font-size: 40px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 16px;
+    margin: 0 0 56px;
+    max-width: 62ch;
+  }
+
+  section {
+    margin-bottom: 72px;
+  }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .thesis-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 20px;
+  }
+
+  .thesis-card .label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+
+  .thesis-card p {
+    font-size: 19px;
+    line-height: 1.55;
+    margin: 0;
+    color: var(--text-primary);
+    text-wrap: balance;
+  }
+
+  .thesis-dims {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-top: 16px;
+  }
+
+  .thesis-dims > div {
+    background: var(--surface);
+    padding: 16px 18px;
+  }
+
+  .thesis-dims .k {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .thesis-dims .v {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* Color swatches */
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .swatch {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .swatch-fill {
+    height: 72px;
+  }
+
+  .swatch-info {
+    padding: 12px 14px;
+  }
+
+  .swatch-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .swatch-hex {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .swatch-contrast {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .swatch-contrast.pass { color: var(--sev-2); }
+  .swatch-contrast.fail { color: var(--sev-5); }
+
+  /* Type specimen */
+  .specimen-row {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .specimen-row:last-child { border-bottom: none; }
+
+  .specimen-meta {
+    width: 160px;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .specimen-meta .size { color: var(--text-secondary); display: block; margin-top: 2px; }
+
+  .sp-display { font-size: 40px; font-weight: 600; letter-spacing: -0.015em; }
+  .sp-h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+  .sp-h2 { font-size: 18px; font-weight: 600; }
+  .sp-body { font-size: 15px; font-weight: 400; color: var(--text-secondary); }
+  .sp-data { font-family: var(--font-mono); font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .sp-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+
+  /* Spacing bars */
+  .space-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .space-row .tok { width: 90px; flex-shrink: 0; }
+  .space-bar { height: 14px; background: var(--accent-dim); border: 1px solid var(--accent); border-radius: 2px; }
+
+  /* Radii samples */
+  .radii-row { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+  .radii-sample {
+    width: 88px; height: 88px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 10px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  }
+
+  /* Component demo */
+  .demo-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .risk-row {
+    display: flex;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    transition: background-color 140ms ease-out, border-color 140ms ease-out;
+    cursor: pointer;
+  }
+
+  .risk-row:last-child { border-bottom: none; }
+
+  .risk-row:hover { background: var(--surface-raised); }
+
+  .risk-row::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+
+  .risk-row.sev-5::before { background: var(--sev-5); }
+  .risk-row.sev-4::before { background: var(--sev-4); }
+  .risk-row.sev-3::before { background: var(--sev-3); }
+
+  .risk-score {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 500;
+    width: 34px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .risk-row.sev-5 .risk-score { color: var(--sev-5); }
+  .risk-row.sev-4 .risk-score { color: var(--sev-4); }
+  .risk-row.sev-3 .risk-score { color: var(--sev-3); }
+
+  .risk-body { flex: 1; min-width: 0; }
+
+  .risk-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+  }
+
+  .risk-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .risk-reasoning {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+
+  .btn {
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 140ms ease-out, border-color 140ms ease-out, transform 140ms ease-out;
+  }
+
+  .btn-primary { background: var(--text-primary); color: var(--bg); }
+  .btn-primary:hover { background: #ffffff; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .btn-secondary { background: transparent; border-color: var(--border-strong); color: var(--text-primary); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-secondary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .btn-disabled { background: var(--surface); border-color: var(--border); color: var(--text-muted); cursor: not-allowed; }
+
+  .state-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); margin-top: 6px; }
+  .btn-demo { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+
+  /* Interaction thesis */
+  .interaction-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .curve-card, .hover-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .curve-card svg { width: 100%; height: 180px; }
+
+  .curve-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 10px;
+  }
+
+  .timing-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    margin-top: 16px;
+  }
+
+  .timing-table td { padding: 6px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+  .timing-table td:first-child { color: var(--text-muted); width: 140px; }
+
+  .hover-demo-box {
+    width: 100%;
+    height: 90px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 16px;
+    transition: background-color 140ms ease-out, border-color 140ms ease-out, transform 140ms ease-out;
+    cursor: pointer;
+  }
+
+  .hover-demo-box:hover {
+    background: var(--surface-raised);
+    border-color: var(--accent);
+  }
+
+  .replay-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+
+  .replay-btn {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .replay-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .reduced-motion-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 10px;
+  }
+
+  .rm-active .hover-demo-box,
+  .rm-active .anim-target { transition: none !important; animation: none !important; }
+
+  .forbidden-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--sev-5);
+  }
+  .forbidden-list li { padding: 3px 0; }
+  .forbidden-list li::before { content: "✕ "; }
+
+  .anim-target {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border-radius: 3px;
+    position: relative;
+    left: 0;
+    transition: left 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Design thesis — genjutsu:paint</p>
+  <h1>IPO Risk Decoder — Vercel/Linear-disciplined dashboard</h1>
+  <p class="subtitle">Portfolio-first redesign: near-black monochrome ground, one sharp signal-blue accent, IBM Plex Sans/Mono throughout, hairline-bordered sharp-edged panels. Every token below feeds the real implementation — nothing here is decorative.</p>
+
+  <section>
+    <h2>Visual thesis</h2>
+    <div class="thesis-card">
+      <p class="label">Statement</p>
+      <p>A near-black monochrome dashboard with one sharp signal-blue accent reserved for action and focus — IBM Plex Sans/Mono for a disciplined, engineered voice, dense-but-organized spacing that opens up between sections and tightens within lists, and sharp hairline-bordered panels instead of soft shadowed cards.</p>
+      <div class="thesis-dims">
+        <div><div class="k">Color</div><div class="v">Near-black ground, one accent (#4C6FFF) reserved for interactive/focus states only; severity keeps its own distinct 5-color scale so state and brand never compete.</div></div>
+        <div><div class="k">Type</div><div class="v">IBM Plex Sans for UI/headings, IBM Plex Mono for every number — scores, percentages, counts. Tight letter-spacing on display sizes.</div></div>
+        <div><div class="k">Spacing</div><div class="v">Generous gaps between sections (32–64px), disciplined tight spacing within lists/tables (8–12px) — Linear's restraint, not uniform airiness.</div></div>
+        <div><div class="k">Components</div><div class="v">Sharp 4px radii max, 1px hairline borders instead of drop shadows, severity encoded as a color stripe + mono score, not prose alone.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Interaction thesis</h2>
+    <div class="thesis-card">
+      <p class="label">Statement</p>
+      <p>Fast, dry, engineered motion — 140–180ms ease-out on every hover and state change, no scale-on-hover, no bounce or elastic easing, no scroll-triggered reveals or parallax. This is a working instrument, not a marketing page.</p>
+      <div class="thesis-dims">
+        <div><div class="k">Timing</div><div class="v">140ms for hover/color transitions, 180ms for positional moves. Nothing slower than 200ms.</div></div>
+        <div><div class="k">Hover</div><div class="v">Background/border shift only — no transform scale, no glow.</div></div>
+        <div><div class="k">Scroll</div><div class="v">None. Content renders immediately; this is scanned data, not a story.</div></div>
+        <div><div class="k">Forbidden</div><div class="v">Bounce, elastic, spring overshoot, scale-on-hover, parallax, decorative scroll reveals.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Color</h2>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="swatch-fill" style="background:#0a0b10"></div><div class="swatch-info"><div class="swatch-name">Ground</div><div class="swatch-hex">#0A0B10</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#12141b"></div><div class="swatch-info"><div class="swatch-name">Surface</div><div class="swatch-hex">#12141B</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#181b24"></div><div class="swatch-info"><div class="swatch-name">Surface raised</div><div class="swatch-hex">#181B24</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#edeef2"></div><div class="swatch-info"><div class="swatch-name">Text primary</div><div class="swatch-hex">#EDEEF2</div><div class="swatch-contrast pass">15.8:1 on ground — AAA</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#9ba0ac"></div><div class="swatch-info"><div class="swatch-name">Text secondary</div><div class="swatch-hex">#9BA0AC</div><div class="swatch-contrast pass">7.1:1 on ground — AAA</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#4c6fff"></div><div class="swatch-info"><div class="swatch-name">Signal (accent)</div><div class="swatch-hex">#4C6FFF</div><div class="swatch-contrast pass">4.9:1 on ground — AA</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#f2545b"></div><div class="swatch-info"><div class="swatch-name">Severity 5 — Severe</div><div class="swatch-hex">#F2545B</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#f2994a"></div><div class="swatch-info"><div class="swatch-name">Severity 4 — High</div><div class="swatch-hex">#F2994A</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#e0b430"></div><div class="swatch-info"><div class="swatch-name">Severity 3 — Moderate</div><div class="swatch-hex">#E0B430</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#4caf7d"></div><div class="swatch-info"><div class="swatch-name">Severity 2 — Low</div><div class="swatch-hex">#4CAF7D</div></div></div>
+      <div class="swatch"><div class="swatch-fill" style="background:#5d7a9e"></div><div class="swatch-info"><div class="swatch-name">Severity 1 — Minimal</div><div class="swatch-hex">#5D7A9E</div></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Type specimen <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">— preview rendered in system fallback; production uses IBM Plex Sans / IBM Plex Mono, self-hosted (no CDN)</span></h2>
+    <div class="specimen-row">
+      <div class="specimen-meta">Display<span class="size">40px / 600</span></div>
+      <div class="sp-display">Zomato Limited</div>
+    </div>
+    <div class="specimen-row">
+      <div class="specimen-meta">H1<span class="size">26px / 600</span></div>
+      <div class="sp-h1">Risk factor register</div>
+    </div>
+    <div class="specimen-row">
+      <div class="specimen-meta">H2<span class="size">18px / 600</span></div>
+      <div class="sp-h2">Top risk categories</div>
+    </div>
+    <div class="specimen-row">
+      <div class="specimen-meta">Body<span class="size">15px / 400</span></div>
+      <div class="sp-body">64 disclosed risk factors, scored against a validated severity rubric.</div>
+    </div>
+    <div class="specimen-row">
+      <div class="specimen-meta">Data (mono)<span class="size">20px / 500</span></div>
+      <div class="sp-data">3.14 / 5 · 41%</div>
+    </div>
+    <div class="specimen-row">
+      <div class="specimen-meta">Eyebrow<span class="size">12px / 600</span></div>
+      <div class="sp-eyebrow">Moderate risk profile</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Spacing scale</h2>
+    <div class="space-row"><div class="tok">--space-2 · 8px</div><div class="space-bar" style="width:8px"></div></div>
+    <div class="space-row"><div class="tok">--space-4 · 16px</div><div class="space-bar" style="width:16px"></div></div>
+    <div class="space-row"><div class="tok">--space-6 · 24px</div><div class="space-bar" style="width:24px"></div></div>
+    <div class="space-row"><div class="tok">--space-8 · 32px</div><div class="space-bar" style="width:32px"></div></div>
+    <div class="space-row"><div class="tok">--space-12 · 48px</div><div class="space-bar" style="width:48px"></div></div>
+    <div class="space-row"><div class="tok">--space-16 · 64px</div><div class="space-bar" style="width:64px"></div></div>
+  </section>
+
+  <section>
+    <h2>Radius</h2>
+    <div class="radii-row">
+      <div class="radii-sample" style="border-radius:0">0px</div>
+      <div class="radii-sample" style="border-radius:4px">4px (max)</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Component — risk register row <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">(real Zomato DRHP data, hover to preview state)</span></h2>
+    <div class="demo-panel">
+      <div class="risk-row sev-5">
+        <div class="risk-score">5</div>
+        <div class="risk-body">
+          <div class="risk-meta"><span class="chip">Financial</span><span class="chip">Risk #2</span></div>
+          <div class="risk-text">We have a history of net losses and we anticipate increased expenses in the future. We have incurred restated loss for the year/period of ₹1,069.16 million, ₹10,102.33 million, ₹23,856.01 million and ₹6,821.99 million in Fiscals 2018, 2019 and 2020…</div>
+          <div class="risk-reasoning">Severe (Financial): quantified material impact with historical financial loss numbers stated.</div>
+        </div>
+      </div>
+      <div class="risk-row sev-4">
+        <div class="risk-score">4</div>
+        <div class="risk-body">
+          <div class="risk-meta"><span class="chip">Financial</span><span class="chip">Risk #1</span></div>
+          <div class="risk-text">We may not be able to sustain our historical growth rates, and our historical performance may not be indicative of our future growth or financial results…</div>
+          <div class="risk-reasoning">High (Financial): specific and material operational dependency, contingent or forward-looking.</div>
+        </div>
+      </div>
+      <div class="risk-row sev-3">
+        <div class="risk-score">3</div>
+        <div class="risk-body">
+          <div class="risk-meta"><span class="chip">Legal</span><span class="chip">Risk #4</span></div>
+          <div class="risk-text">If we fail to retain our existing restaurant partners, customers or delivery partners or fail to add new restaurant partners…</div>
+          <div class="risk-reasoning">Moderate (Legal): real business risk stated vaguely without specific numbers or metrics.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Buttons — five states</h2>
+    <div class="btn-row">
+      <div class="btn-demo"><button class="btn btn-primary">Refresh coverage</button><div class="state-label">default / hover / active / focus-visible (tab to it)</div></div>
+      <div class="btn-demo"><button class="btn btn-secondary">View methodology</button><div class="state-label">secondary — same states</div></div>
+      <div class="btn-demo"><button class="btn btn-disabled" disabled>Processing…</button><div class="state-label">disabled</div></div>
+    </div>
+  </section>
+
+  <section id="interaction-section">
+    <h2>Interaction thesis — proof, not description</h2>
+    <div class="interaction-grid">
+      <div class="curve-card">
+        <p class="label" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin:0 0 12px">Positional easing curve</p>
+        <svg viewBox="0 0 240 180">
+          <line x1="20" y1="10" x2="20" y2="160" stroke="#5f6570" stroke-width="1"/>
+          <line x1="20" y1="160" x2="220" y2="160" stroke="#5f6570" stroke-width="1"/>
+          <path d="M 20 160 C 58.4 160 68 -10 220 10" fill="none" stroke="#4c6fff" stroke-width="2"/>
+          <circle cx="20" cy="160" r="3" fill="#edeef2"/>
+          <circle cx="220" cy="10" r="3" fill="#edeef2"/>
+        </svg>
+        <div class="curve-value">cubic-bezier(0.16, 1, 0.3, 1) — "ease-out-expo," 180ms</div>
+        <div class="timing-table">
+          <table>
+            <tr><td>hover / color</td><td>140ms, ease-out</td></tr>
+            <tr><td>positional move</td><td>180ms, cubic-bezier(0.16,1,0.3,1)</td></tr>
+            <tr><td>panel open</td><td>160ms, ease-out</td></tr>
+            <tr><td>scale on hover</td><td>never</td></tr>
+          </table>
+        </div>
+        <ul class="forbidden-list">
+          <li>bounce / elastic overshoot</li>
+          <li>spring physics for simple hovers</li>
+          <li>scroll-triggered reveal</li>
+        </ul>
+      </div>
+      <div class="hover-card">
+        <p class="label" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin:0 0 12px">Live demo</p>
+        <div class="hover-demo-box">hover this panel — 140ms border/bg shift, no scale</div>
+        <div style="margin-top:20px">
+          <div class="anim-target" id="animTarget"></div>
+        </div>
+        <div class="replay-row">
+          <button class="replay-btn" onclick="replayAnim()">▶ replay move (180ms)</button>
+          <label style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="rmToggle" onchange="toggleRM()"> simulate prefers-reduced-motion
+          </label>
+        </div>
+        <p class="reduced-motion-note">With reduced motion on, all transitions/animations above are removed entirely — state still changes, it just doesn't move.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  function replayAnim() {
+    const el = document.getElementById('animTarget');
+    el.style.left = '0px';
+    requestAnimationFrame(() => requestAnimationFrame(() => { el.style.left = '160px'; }));
+    setTimeout(() => { el.style.left = '0px'; }, 900);
+  }
+  function toggleRM() {
+    document.body.classList.toggle('rm-active', document.getElementById('rmToggle').checked);
+  }
+</script>

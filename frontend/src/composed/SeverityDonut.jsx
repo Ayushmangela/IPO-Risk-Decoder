@@ -1,6 +1,12 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { SEVERITY_LABELS, SEVERITY_COLOR_HEX, CHART_COLORS } from '../constants';
+import {
+  SEVERITY_LABELS,
+  SEVERITY_COLOR_HEX,
+  CHART_COLORS,
+  CHART_FONT_MONO,
+  CHART_TOOLTIP_STYLE,
+} from '../constants';
 
 export default function SeverityDonut({ risks }) {
   const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
@@ -30,22 +36,29 @@ export default function SeverityDonut({ risks }) {
             <Cell key={d.score} fill={SEVERITY_COLOR_HEX[d.score]} />
           ))}
         </Pie>
-        <Tooltip
-          contentStyle={{
-            background: '#1c2025',
-            border: '1px solid rgba(255,255,255,0.16)',
-            borderRadius: 6,
-            fontSize: 12,
-            color: '#edeef0',
-          }}
-        />
+        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
         <Legend
           verticalAlign="middle"
           layout="vertical"
           align="right"
-          iconType="circle"
+          iconType="square"
           iconSize={8}
-          wrapperStyle={{ fontSize: 12, color: CHART_COLORS.textSecondary }}
+          formatter={(value, entry) => (
+            <span style={{ color: CHART_COLORS.textSecondary, fontSize: 12 }}>
+              {value}
+              <span
+                style={{
+                  color: CHART_COLORS.textMuted,
+                  fontFamily: CHART_FONT_MONO,
+                  fontSize: 11,
+                  marginLeft: 6,
+                }}
+              >
+                {entry?.payload?.value ?? 0}
+              </span>
+            </span>
+          )}
+          wrapperStyle={{ fontSize: 12, lineHeight: 1.9 }}
         />
       </PieChart>
     </ResponsiveContainer>

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MagnifyingGlass, Buildings, ArrowRight } from '@phosphor-icons/react';
+import { useOverlayTransition } from '../motion';
 
 export default function CommandPalette({ open, onClose, companies, views, onSelectCompany, onSelectView }) {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef(null);
+  const { mounted, panelRef, overlayRef } = useOverlayTransition(open);
 
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -55,11 +57,12 @@ export default function CommandPalette({ open, onClose, companies, views, onSele
     onClose();
   }
 
-  if (!open) return null;
+  // `mounted` (not `open`) so the exit animation can finish before unmount.
+  if (!mounted) return null;
 
   return (
-    <div className="cmdk-overlay" onMouseDown={onClose}>
-      <div className="cmdk-panel" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="cmdk-overlay" onMouseDown={onClose} ref={overlayRef}>
+      <div className="cmdk-panel" onMouseDown={(e) => e.stopPropagation()} ref={panelRef}>
         <div className="cmdk-input-row">
           <MagnifyingGlass size={16} />
           <input
