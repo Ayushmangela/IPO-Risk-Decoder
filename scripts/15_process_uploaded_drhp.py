@@ -72,6 +72,10 @@ BACKED_UP_FILES = [
 sys.path.insert(0, str(BASE_DIR))
 llm_pipeline = importlib.import_module("scripts.03_llm_pipeline")
 _call_gemini_llm = llm_pipeline._call_gemini_llm
+# Backend-agnostic dispatcher ("local" -> Ollama, "gemini" -> API). Script 03
+# has always had this; script 15 previously hardcoded Gemini at every call
+# site, which is why a local run was impossible even though the driver existed.
+query_llm = llm_pipeline.query_llm
 clean_json_response = llm_pipeline.clean_json_response
 load_few_shot_examples = llm_pipeline.load_few_shot_examples
 RUBRIC_DESCRIPTION = llm_pipeline.RUBRIC_DESCRIPTION
@@ -329,6 +333,9 @@ def score_risks_strict(risk_items, backend="gemini", rate_limit_sleep=5.0, progr
         rtext = item["risk_text"]
         rnum = item["risk_number"]
 
+        # Only the hosted API needs pacing; a local model has no quota or RPM
+        # ceiling, so sleeping between items would just make runs slower for
+        # no reason.
         if backend == "gemini" and i > 0:
             time.sleep(rate_limit_sleep)
 
@@ -350,9 +357,15 @@ def score_risks_strict(risk_items, backend="gemini", rate_limit_sleep=5.0, progr
         prompt = f'Risk Factor: "{rtext}"'
 
         try:
-            raw_resp = _call_gemini_llm(prompt, system_prompt) if backend == "gemini" else None
-            if backend != "gemini":
-                raise ValueError(f"Unsupported backend '{backend}' for strict scoring.")
+            raw_resp = query_llm(prompt, system_prompt, backend=backend)
+            if not raw_resp:
+                # "heuristic" returns None by design. Strict scoring must never
+                # fall back to keyword guessing -- that's the placeholder data
+                # this whole module exists to refuse to write.
+                raise ValueError(
+                    f"Backend '{backend}' returned no response. Strict scoring requires "
+                    f"a real model backend ('gemini' or 'local')."
+                )
             parsed = clean_json_response(raw_resp)
             cat = str(parsed.get("category", "")).strip().capitalize()
             if cat not in VALID_CATEGORIES:
@@ -495,7 +508,7 @@ def extract_litigation_and_industry(pdf_path: Path, company_id: str, company_nam
     )
 
     try:
-        raw_resp = _call_gemini_llm(prompt, system_prompt)
+        raw_resp = query_llm(prompt, system_prompt, backend=backend)
         parsed = clean_json_response(raw_resp)
     except Exception as exc:
         raise PipelineStepError(
@@ -558,7 +571,7 @@ def extract_litigation_and_industry(pdf_path: Path, company_id: str, company_nam
 # companies' data files, same as their current un-surfaced state)
 # =====================================================================
 
-def extract_proceeds_and_promoter(pdf_path: Path, company_id: str, company_name: str):
+def extract_proceeds_and_promoter(pdf_path: Path, company_id: str, company_name: str, backend="gemini"):
     doc = fitz.open(pdf_path)
     try:
         try:
@@ -605,7 +618,7 @@ def extract_proceeds_and_promoter(pdf_path: Path, company_id: str, company_name:
     )
 
     try:
-        raw_resp = _call_gemini_llm(prompt, system_prompt)
+        raw_resp = query_llm(prompt, system_prompt, backend=backend)
         parsed = clean_json_response(raw_resp)
     except Exception as exc:
         raise PipelineStepError(
@@ -807,9 +820,25 @@ def recompute_derived_metrics():
 # ORCHESTRATOR
 # =====================================================================
 
-def run_full_pipeline(pdf_path: Path, company_id: str, company_name: str, sector: str = "Uploaded", log=print):
+def run_full_pipeline(pdf_path: Path, company_id: str, company_name: str, sector: str = "Uploaded",
+                      backend: str = None, log=print):
     """Runs every step in order. Raises PipelineStepError naming exactly
-    which step failed. Returns a list of completed step names on success."""
+    which step failed. Returns a list of completed step names on success.
+
+    backend: "gemini" (hosted API) or "local" (Ollama). Defaults to the
+    LLM_BACKEND env var so a machine can be switched over in .env without
+    touching call sites. "heuristic" is rejected -- strict scoring must never
+    write keyword-guessed placeholder data."""
+    if backend is None:
+        backend = os.getenv("LLM_BACKEND", "gemini")
+    backend = backend.strip().lower()
+    if backend not in ("gemini", "local"):
+        raise PipelineStepError(
+            "backend_selection",
+            f"Unsupported backend '{backend}'. Use 'gemini' or 'local' -- "
+            f"'heuristic' cannot be used for strict scoring.",
+        )
+
     completed_steps = []
 
     log(f"[0/8] Backing up existing data...")
@@ -833,23 +862,23 @@ def run_full_pipeline(pdf_path: Path, company_id: str, company_name: str, sector
     completed_steps.append("risk_extraction")
     log(f"      Extracted {len(risk_items)} risk items.")
 
-    log(f"[3/8] Scoring {len(risk_items)} risk items via Gemini (this is the slow step)...")
+    log(f"[3/8] Scoring {len(risk_items)} risk items via {backend.upper()} (this is the slow step)...")
 
     def _progress(done, total):
         if done % 10 == 0 or done == total:
             log(f"      Scored {done}/{total} risk items...")
 
-    scored_risks = score_risks_strict(risk_items, backend="gemini", progress_cb=_progress)
+    scored_risks = score_risks_strict(risk_items, backend=backend, progress_cb=_progress)
     completed_steps.append("risk_scoring")
 
     log("[4/8] Extracting + scoring litigation cases and industry overview...")
-    lit_industry = extract_litigation_and_industry(pdf_path, company_id, company_name, backend="gemini")
+    lit_industry = extract_litigation_and_industry(pdf_path, company_id, company_name, backend=backend)
     completed_steps.append("litigation_industry_extraction")
     log(f"      Found {len(lit_industry['litigation_scores'])} litigation cases.")
 
     log("[5/8] Extracting proceeds allocation + promoter structure...")
     try:
-        proceeds_promoter = extract_proceeds_and_promoter(pdf_path, company_id, company_name)
+        proceeds_promoter = extract_proceeds_and_promoter(pdf_path, company_id, company_name, backend=backend)
         completed_steps.append("proceeds_promoter_extraction")
     except PipelineStepError as exc:
         # Lower-stakes than the core risk/litigation pipeline and not

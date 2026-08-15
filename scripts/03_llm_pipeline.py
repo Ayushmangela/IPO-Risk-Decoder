@@ -31,6 +31,11 @@ load_dotenv(BASE_DIR / "backend" / ".env")
 LLM_BACKEND = os.getenv("LLM_BACKEND", "gemini")  # "local", "gemini", or "heuristic"
 LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:11434/api/generate")
 LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "llama3.2:3b")
+# Local inference is far slower than a hosted API: a risk-factor prompt runs
+# ~6k chars, and the first call also pays cold model load. The old hardcoded
+# 30s timed out before an 8B model could answer even once. Generous default,
+# overridable for slower hardware or bigger models.
+LOCAL_LLM_TIMEOUT = int(os.getenv("LOCAL_LLM_TIMEOUT", "600"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
 
 # Pin an explicit model rather than the floating "gemini-flash-latest" alias.
@@ -120,7 +125,7 @@ def _call_local_llm(prompt: str, system_prompt: str) -> str:
         "stream": False,
         "format": "json",
     }
-    response = requests.post(LOCAL_LLM_URL, json=payload, timeout=30)
+    response = requests.post(LOCAL_LLM_URL, json=payload, timeout=LOCAL_LLM_TIMEOUT)
     response.raise_for_status()
     data = response.json()
     return data.get("response", "")
