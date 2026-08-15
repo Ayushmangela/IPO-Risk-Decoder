@@ -33,6 +33,14 @@ LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:11434/api/generate"
 LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "llama3.2:3b")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
 
+# Pin an explicit model rather than the floating "gemini-flash-latest" alias.
+# The alias silently re-points as Google ships new models, and its current
+# target (gemini-3.7-flash) carries a FREE-tier cap of 20 requests/day --
+# below what a single 30-item filing needs (~32), so the pipeline could never
+# complete on it regardless of pacing. GEMINI.md specifies Gemini 2.5 Flash;
+# the alias had drifted away from that. Override with GEMINI_MODEL in .env.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
 VALID_CATEGORIES = [
     "Financial",
     "Legal",
@@ -131,7 +139,8 @@ def _call_gemini_llm(prompt: str, system_prompt: str) -> str:
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
+    model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     full_prompt = f"{system_prompt}\n\nUSER PROMPT:\n{prompt}"
     payload = {
         "contents": [{"parts": [{"text": full_prompt}]}],
@@ -170,6 +179,21 @@ def _call_gemini_llm(prompt: str, system_prompt: str) -> str:
                     continue
                 raise RuntimeError(f"Gemini API HTTP {response.status_code} persisted after {max_retries} attempts: {http_err}") from http_err
             raise http_err
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as net_err:
+            # A read timeout or dropped connection is transient and carries no
+            # status code, so it never reached the HTTPError branch above and
+            # killed the whole run on the first blip -- observed at item 12/30
+            # of a clean run. Same backoff as a 503: the request may or may not
+            # have been billed, but a retry is correct either way since the
+            # pipeline writes nothing until every item scores.
+            if attempt < max_retries:
+                wait_time = 10 * attempt
+                print(f"⚠️ Gemini API network error ({type(net_err).__name__}). Retrying attempt {attempt}/{max_retries} in {wait_time}s...")
+                time.sleep(wait_time)
+                continue
+            raise RuntimeError(
+                f"Gemini API network error persisted after {max_retries} attempts: {net_err}"
+            ) from net_err
 
 
 

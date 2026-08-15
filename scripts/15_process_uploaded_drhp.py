@@ -309,9 +309,21 @@ def extract_risk_items(pdf_path: Path, company_id: str):
 # STEP 4: STRICT LLM RISK SCORING (no silent heuristic fallback)
 # =====================================================================
 
-def score_risks_strict(risk_items, backend="gemini", rate_limit_sleep=1.5, progress_cb=None):
+def score_risks_strict(risk_items, backend="gemini", rate_limit_sleep=5.0, progress_cb=None):
     """Scores every risk item via Gemini. Raises immediately -- naming the
-    exact risk number -- on any failure. No heuristic fallback."""
+    exact risk number -- on any failure. No heuristic fallback.
+
+    rate_limit_sleep defaults to 5s (~12 req/min) to stay under the Gemini
+    Flash per-minute ceiling. The old 1.5s paced ~40 req/min, well over it.
+
+    IMPORTANT -- this alone does NOT make a full filing runnable on the free
+    tier. The binding limit is GenerateRequestsPerDayPerProjectPerModel-FreeTier
+    = 20 requests/day/model (confirmed against both gemini-3.7-flash and
+    gemini-2.5-flash on 2026-08-15). A 30-item filing needs ~32 requests, so it
+    cannot complete on the free tier at any pacing, and retries consume the
+    same daily budget. Running a full filing requires billing enabled on the
+    Google Cloud project (cost is negligible -- ~32 short Flash requests), or
+    resumability so partial progress can be banked across days."""
     scored = []
     for i, item in enumerate(risk_items):
         rtext = item["risk_text"]
